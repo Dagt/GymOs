@@ -1,5 +1,9 @@
 # ADR-002 — Consistencia financiera, idempotencia y devoluciones
 
+El alcance #34 mantiene bloqueada la devolución manual de un cobro Stripe.
+La confirmación de un reembolso y su efecto sobre membresías o visitas
+requieren un contrato de conciliación y la decisión pendiente en #35.
+
 **Estado:** PROPOSED (29/10/2026). **Issues:** #33 #34 #35. **OQ:** OQ-005.
 
 ## Contexto

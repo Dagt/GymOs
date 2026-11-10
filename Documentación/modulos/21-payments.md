@@ -1,5 +1,18 @@
 # Payments
 
+Stripe Checkout comprueba el estado de la sesión en Connect al recuperarla.
+Cada reemplazo queda vinculado al intento anterior por su clave idempotente.
+PostgreSQL serializa la reserva con la confirmación de la venta. Un resultado
+incierto no abre otra sesión. Para creaciones sin identificador externo y
+fuera de la ventana segura, consultar el historial de Stripe antes de actuar.
+
+Checkout trata los eventos firmados de expiración y fallo asíncrono con una
+lectura autoritativa de la cuenta Connect. Un intento terminal sin pago puede
+volver a abrirse sobre la misma venta y el mismo pago. Setup vuelve a usar la
+solicitud estable mientras se recupera de un timeout. Los reembolsos Stripe
+siguen bloqueados en la ruta manual. Consulta la [matriz de
+evidencia](../40-qa-matriz-de-aceptacion-y-evidencias.md#pay-001-y-self-001-34).
+
 Estado: FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA
 Última revisión: 21 de agosto de 2026
 

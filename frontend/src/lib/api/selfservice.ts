@@ -12,6 +12,7 @@ import type {
   KioskPlanChangeCheckoutPayload,
   KioskProfile,
   KioskRegistrationPayload,
+  KioskRecoveredCheckout,
   KioskSessionResponse,
   KioskSummaryResponse,
   KioskVisitPackageCheckout,
@@ -50,11 +51,20 @@ export async function registerKioskClient(
   });
 }
 
+export async function recoverKioskCheckout(sessionId: string, sessionToken: string, paymentId: string): Promise<KioskRecoveredCheckout> {
+  return publicApiFetch<KioskRecoveredCheckout>(`/self-service/sessions/${sessionId}/payments/${paymentId}/checkout`, {
+    method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
+  });
+}
+
 export async function getKioskSummary(
   sessionId: string,
   sessionToken: string,
+  signal?: AbortSignal,
 ): Promise<KioskSummaryResponse> {
   return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/summary`, {
+    signal,
     headers: kioskSessionHeaders(sessionToken),
   });
 }
@@ -220,10 +230,11 @@ export async function getKioskAutopayMandate(
   sessionId: string,
   sessionToken: string,
   membershipId: string,
+  signal?: AbortSignal,
 ): Promise<KioskAutopayMandate | undefined> {
   return publicApiFetch<KioskAutopayMandate | undefined>(
     `/self-service/sessions/${sessionId}/autopay/${membershipId}`,
-    { headers: kioskSessionHeaders(sessionToken) },
+    { headers: kioskSessionHeaders(sessionToken), signal },
   );
 }
 

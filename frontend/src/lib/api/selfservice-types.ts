@@ -138,6 +138,7 @@ export type KioskVisitPackageCheckout = {
   providerOperationId: string | null;
   checkoutUrl: string | null;
   checkoutStatus: string | null;
+  providerSessionId: string | null;
 };
 
 export type KioskSessionResponse = {
@@ -179,6 +180,7 @@ export type KioskPaymentActivity = {
   receiptUrl: string | null;
   checkoutUrl: string | null;
   providerUpdatedAt: string | null;
+  checkoutRecoverable: boolean;
 };
 
 export type KioskSessionContext = {
@@ -254,3 +256,11 @@ export type KioskRegistrationPayload = {
 };
 
 export type { RenewMembershipResponse };
+
+export type KioskRecoveredCheckout = {
+  saleId: string;
+  paymentId: string;
+  providerSessionId: string | null;
+  checkoutUrl: string | null;
+  status: "OPEN" | "COMPLETED" | "AWAITING_PAYMENT";
+};

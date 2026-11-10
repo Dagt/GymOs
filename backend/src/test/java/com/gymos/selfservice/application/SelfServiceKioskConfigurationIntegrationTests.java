@@ -1,6 +1,7 @@
 package com.gymos.selfservice.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.api.operations.BookingOperations;
 import com.gymos.clients.api.operations.ClientLookupOperations;
+import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.RateLimiter;
 import com.gymos.memberships.api.operations.MembershipEnrollmentOperations;
@@ -112,19 +114,23 @@ class SelfServiceKioskConfigurationIntegrationTests {
 		);
 		var resetDisabled = selfService.reset(
 				launched.sessionId(), launched.sessionToken(), "reset-disabled");
+		assertThat(resetDisabled.sessionToken()).isNotEqualTo(launched.sessionToken());
+		assertThatThrownBy(() -> selfService.reset(launched.sessionId(), launched.sessionToken(), "stale-reset"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("SELF_SERVICE_SESSION_INVALID"));
 		assertPersisted("clientRegistration", false);
 		assertThat(resetDisabled.capabilities().clientRegistrationAllowed()).isFalse();
 		assertThat(resetDisabled.capabilities().membershipEnrollmentAllowed()).isTrue();
 
 		settingsService.configure(manager, branchId, enabled, "settings-registration-enabled-again");
 		var resetEnabled = selfService.reset(
-				launched.sessionId(), launched.sessionToken(), "reset-enabled");
+				resetDisabled.sessionId(), resetDisabled.sessionToken(), "reset-enabled");
 		assertPersisted("clientRegistration", true);
 		assertThat(resetEnabled.capabilities().clientRegistrationAllowed()).isTrue();
 
 		payments.set(readyStripe());
 		var resetReady = selfService.reset(
-				launched.sessionId(), launched.sessionToken(), "reset-stripe-ready");
+				resetEnabled.sessionId(), resetEnabled.sessionToken(), "reset-stripe-ready");
 		assertThat(resetReady.capabilities().membershipEnrollmentAllowed()).isTrue();
 		assertThat(resetReady.capabilities().visitPackagePurchaseAllowed()).isTrue();
 		assertThat(resetReady.capabilities().onlineCardPaymentsReady()).isTrue();

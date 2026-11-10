@@ -15,6 +15,7 @@ import {
 const context: KioskAutopayReturnContext = {
   sessionId: "session-1",
   membershipId: "membership-1",
+  mandateId: "mandate-1",
   providerSessionId: "cs_test_1",
   returnPath: "/kiosk/reception",
   startedAt: "2026-08-20T15:00:00.000Z",
@@ -47,6 +48,7 @@ test("payment return preserves the payment used to reconcile Stripe", () => {
     sessionId: context.sessionId,
     paymentId: "payment-1",
     saleId: "sale-1",
+    providerSessionId: "cs_payment_1",
     returnPath: context.returnPath,
     startedAt: context.startedAt,
   };
@@ -62,7 +64,7 @@ test("Stripe session match detects a stale or unrelated return", () => {
   assert.equal(matchesStripeCheckoutSession(context, "cs_test_1"), true);
   assert.equal(matchesStripeCheckoutSession(context, "cs_test_other"), false);
   assert.equal(matchesStripeCheckoutSession(context, null), false);
-  assert.equal(matchesStripeCheckoutSession({ ...context, providerSessionId: null }, "cs_test_other"), true);
+  assert.equal(matchesStripeCheckoutSession({ ...context, providerSessionId: null }, "cs_test_other"), false);
 });
 
 test("autopay result only reports success for an active mandate", () => {

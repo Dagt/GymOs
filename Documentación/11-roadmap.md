@@ -1,5 +1,10 @@
 # 11. Roadmap de implementación
 
+PAY-001 y SELF-001 (#34) incorporan recuperación del pago y rotación de la
+credencial del kiosco. La puerta de piloto sigue siendo la [aceptación en
+Stripe test y staging](../docs/testing/stripe-kiosk-test-mode.md), con
+conciliación de reembolsos y política de derechos separadas en #35.
+
 El issue #29 incorpora el [inventario de autorización](../docs/security/endpoint-permissions.md) y la [matriz de aislamiento](../docs/security/multi-tenant-verification.md) a la verificación de piloto, con pruebas de matchers y regresiones HTTP/PostgreSQL. Las verificaciones de sesiones, consistencia financiera y proveedores conectados se siguen en #28, #33 y #34.
 
 > **Adenda 29/10/2026:** El bloque histórico «En curso inmediato» refleja agosto. Los planes/beneficios/paquetes multi-sucursal (V98–V103) ya están en main, pero faltan E2E conectadas/seguridad/hardware para certificar. El Connector existe en rama posterior no fusionada. Usar [MVP](35-mvp-y-criterios-de-salida.md), [backlog](36-epicas-backlog-codex.md) y [auditoría](37-auditoria-repositorio-2026-10-29.md) como corte operativo actual.

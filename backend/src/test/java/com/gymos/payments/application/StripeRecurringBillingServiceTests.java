@@ -125,8 +125,37 @@ class StripeRecurringBillingServiceTests {
 				eq("application/x-www-form-urlencoded")
 		);
 		assertThat(body.getValue()).contains("mode=setup");
-		assertThat(body.getValue()).contains("setup_intent_data%5Bmetadata%5D%5Bgymos_mandate_id%5D");
+		assertThat(body.getValue()).contains("setup_intent_data%5Bmetadata%5D%5Bgymos_membership_id%5D");
 		assertThat(body.getValue()).doesNotContain("setup_intent_data%5Busage%5D");
+
+		when(recurringRepository.currentMandate(context.organizationId(), context.branchId(),
+				context.clientId(), context.membershipId())).thenReturn(Optional.of(mandate));
+		when(providerRepository.latestOperationForMandate(context.organizationId(), "STRIPE", "SETUP_SESSION", mandateId))
+				.thenReturn(Optional.of(createdOperation));
+		var resumed = service.beginSetup(new BeginMandateSetupCommand(
+				context, StripeRecurringBillingService.TERMS_VERSION, true,
+				"new-browser-key", "SELF_SERVICE_KIOSK", "correlation"
+		));
+		assertThat(resumed.mandateId()).isEqualTo(mandateId);
+		assertThat(resumed.providerSessionId()).isEqualTo("cs_setup");
+		verify(providerRepository).createOperation(any());
+		verify(http).exchange(eq("POST"), eq("https://stripe.test/v1/checkout/sessions"), any(), any(),
+				eq("application/x-www-form-urlencoded"));
+	}
+
+	@Test
+	void expiredSetupDoesNotActivateTheMandate() throws Exception {
+		MandateRecord pending = mandate("PENDING_SETUP", null, null, null);
+		OperationRecord operation = setupOperation(pending);
+		when(recurringRepository.mandate(pending.id())).thenReturn(Optional.of(pending));
+		when(configurationRepository.providerConfiguration(pending.organizationId())).thenReturn(readyConfiguration());
+		when(http.exchange(eq("GET"), eq("https://stripe.test/v1/checkout/sessions/cs_setup"), any(), isNull(), isNull()))
+				.thenReturn(objectMapper.readTree("{\"id\":\"cs_setup\",\"mode\":\"setup\",\"status\":\"expired\"}"));
+
+		assertThat(service.completeSetup(operation).status()).isEqualTo("PENDING_SETUP");
+
+		verify(providerRepository).markOperationStatus(eq(operation.id()), eq("EXPIRED"), any(), eq(false));
+		verify(eventPublisher, never()).publishEvent(any());
 	}
 
 	@Test

@@ -1,5 +1,18 @@
 # 13. Estado actual de desarrollo
 
+## Stripe y kiosco (#34)
+
+La recuperación de Checkout en el PR #69 exige evidencia actual de Stripe
+para reutilizar una sesión o abrir un reemplazo. El flujo conserva el pago y
+la venta. Las pruebas con un gateway simulado y PostgreSQL no sustituyen la
+verificación conectada en Stripe Sandbox.
+
+La propuesta implementa recuperación de Checkout sobre la venta y el pago
+existentes, rotación de la sesión al limpiar el kiosco y estados autoritativos
+de expiración y fallo. La [matriz QA](40-qa-matriz-de-aceptacion-y-evidencias.md#pay-001-y-self-001-34)
+separa pruebas automatizadas, Stripe test y staging. La aceptación externa y
+los reembolsos de proveedor continúan pendientes.
+
 ## Aislamiento multi-tenant en revisión
 
 El trabajo de #29 parte del commit `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora check-in manual y reversiones de #65. El [inventario por operación](../docs/security/endpoint-permissions.md) se coteja con Spring en CI. La [matriz de verificación](../docs/security/multi-tenant-verification.md) identifica qué flujos se probaron además con HTTP/PostgreSQL, las deudas de otros issues y el check externo. El PR #66 conserva los resultados por SHA.

@@ -14,6 +14,7 @@ import com.gymos.payments.infrastructure.PaymentProviderRepository.CreateOperati
 import com.gymos.payments.infrastructure.PaymentProviderRepository.OperationRecord;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -78,6 +79,9 @@ public class StripeProviderService implements StripeCheckoutOperations {
 				.filter(value -> value != null && !value.isBlank())
 				.orElseThrow(() -> new BusinessException("STRIPE_NOT_LINKED", "Inicia la vinculacion de Stripe antes de verificarla."));
 		JsonNode response = http.exchange("GET", stripeUrl("/v1/accounts/" + accountId), stripeHeaders(null), null, null);
+		if (!accountId.equals(requiredText(response, "id", "STRIPE_ACCOUNT_INVALID"))) {
+			throw new BusinessException("STRIPE_ACCOUNT_INVALID", "Stripe devolvió una cuenta distinta de la vinculada.");
+		}
 		boolean connected = response.path("details_submitted").asBoolean(false)
 				&& response.path("charges_enabled").asBoolean(false);
 		providerRepository.saveStripeAccount(
@@ -102,23 +106,48 @@ public class StripeProviderService implements StripeCheckoutOperations {
 			);
 		}
 
-		OperationRecord latest = providerRepository.latestOperationForPayment(
-				command.organizationId(), PROVIDER, "CHECKOUT_SESSION", command.paymentId()
-		).orElse(null);
-		String operationKey = latest != null && retryableTerminal(latest.status())
-				? "stripe-retry:" + command.paymentId() + ":" + latest.id()
-				: command.idempotencyKey();
-		UUID operationId = latest != null && !retryableTerminal(latest.status())
-				? latest.id()
-				: providerRepository.createOperation(new CreateOperationData(
-						command.organizationId(), command.branchId(), PROVIDER, "CHECKOUT_SESSION",
-						command.saleId(), command.paymentId(), command.clientId(), operationKey,
-						command.amountCents(), normalizeCurrency(command.currency())
-				));
-		OperationRecord existing = providerRepository.operation(operationId).orElseThrow();
-		if (existing.externalOperationId() != null && existing.checkoutUrl() != null) {
-			return new CheckoutSessionResult(operationId, existing.externalOperationId(), existing.checkoutUrl(), existing.status());
+		for (int attempt = 0; attempt < 3; attempt++) {
+			CreateOperationData data = checkoutData(command, command.idempotencyKey());
+			String paymentState = providerRepository.checkoutPaymentState(data);
+			if (!"PENDING_VALIDATION".equals(paymentState)) return withoutCheckout(null, paymentState);
+			OperationRecord latest = providerRepository.latestOperationForPayment(
+					command.organizationId(), PROVIDER, "CHECKOUT_SESSION", command.paymentId()).orElse(null);
+			if (latest != null) {
+				requireMatchingCheckout(latest, command);
+				if ("COMPLETED".equals(latest.status())) return withoutCheckout(latest.id(), "AWAITING_PAYMENT");
+				if (latest.externalOperationId() == null) {
+					return submitCheckout(command, latest, configuration.stripeAccountId());
+				}
+				var observation = observeCheckout(latest, configuration.stripeAccountId());
+				if (!observation.retryAllowed()) return checkoutResult(latest, observation, data);
+			}
+			// The first reservation uses the original key. A replacement is linked to its predecessor.
+			String key = latest == null ? command.idempotencyKey()
+					: "stripe-retry:" + command.paymentId() + ":" + latest.id();
+			var reservation = providerRepository.reserveCheckout(checkoutData(command, key), latest == null ? null : latest.id());
+			if (!"PENDING_VALIDATION".equals(reservation.paymentState())) return withoutCheckout(null, reservation.paymentState());
+			if (reservation.operation() != null) {
+				requireMatchingCheckout(reservation.operation(), command);
+				return submitCheckout(command, reservation.operation(), configuration.stripeAccountId());
+			}
+			// Another request reserved a new attempt while we were consulting Stripe.
 		}
+		return withoutCheckout(null, "AWAITING_PAYMENT");
+	}
+
+	private CreateOperationData checkoutData(CreateCheckoutSessionCommand command, String key) {
+		return new CreateOperationData(command.organizationId(), command.branchId(), PROVIDER, "CHECKOUT_SESSION",
+				command.saleId(), command.paymentId(), command.clientId(), key, command.amountCents(), normalizeCurrency(command.currency()));
+	}
+
+	private CheckoutSessionResult submitCheckout(CreateCheckoutSessionCommand command, OperationRecord operation, String accountId) {
+		CreateOperationData data = checkoutData(command, operation.idempotencyKey());
+		String paymentState = providerRepository.checkoutPaymentState(data);
+		if (!"PENDING_VALIDATION".equals(paymentState)) return withoutCheckout(operation.id(), paymentState);
+		if (!"CREATING".equals(operation.status()) || !providerRepository.checkoutCreationReplayAllowed(operation.id())) {
+			return withoutCheckout(operation.id(), "AWAITING_PAYMENT");
+		}
+		UUID operationId = operation.id();
 
 		Map<String, Object> body = PaymentProviderEncoding.values();
 		body.put("mode", "payment");
@@ -135,18 +164,73 @@ public class StripeProviderService implements StripeCheckoutOperations {
 		body.put("payment_intent_data[metadata][gymos_operation_id]", operationId);
 		JsonNode response = http.exchange(
 				"POST", stripeUrl("/v1/checkout/sessions"),
-				stripeHeaders(configuration.stripeAccountId(), existing.idempotencyKey()),
+				stripeHeaders(accountId, operation.idempotencyKey()),
 				PaymentProviderEncoding.form(body), "application/x-www-form-urlencoded"
 		);
 		String sessionId = requiredText(response, "id", "STRIPE_SESSION_INVALID");
-		String checkoutUrl = requiredText(response, "url", "STRIPE_SESSION_INVALID");
-		String status = response.path("status").asText("open").toUpperCase();
+		String checkoutUrl = text(response, "url");
+		String status = response.path("status").asText("AWAITING_PAYMENT").toUpperCase(java.util.Locale.ROOT);
 		OffsetDateTime expiresAt = response.hasNonNull("expires_at")
 				? OffsetDateTime.ofInstant(java.time.Instant.ofEpochSecond(response.path("expires_at").asLong()), java.time.ZoneOffset.UTC)
 				: null;
 		providerRepository.markOperationCreated(operationId, sessionId, status, checkoutUrl, json(response), expiresAt);
-		return new CheckoutSessionResult(operationId, sessionId, checkoutUrl, status);
+		OperationRecord stored = providerRepository.operation(operationId).orElseThrow();
+		// Stripe can return the original POST response on replay, even if the session has since closed.
+		return checkoutResult(stored, observeCheckout(stored, accountId), data);
 	}
+
+	private CheckoutObservation observeCheckout(OperationRecord operation, String accountId) {
+		JsonNode session;
+		try {
+			session = http.exchange("GET", stripeUrl("/v1/checkout/sessions/" + operation.externalOperationId()
+					+ "?expand[]=payment_intent.latest_charge"), stripeHeaders(accountId), null, null);
+		} catch (BusinessException exception) {
+			return new CheckoutObservation(null, false);
+		}
+		if (session == null || !operation.externalOperationId().equals(session.path("id").asText())
+				|| !"payment".equals(session.path("mode").asText())
+				|| !session.path("amount_total").isIntegralNumber() || !session.path("amount_total").canConvertToLong()
+				|| session.path("amount_total").longValue() != operation.amountCents()
+				|| !operation.currency().equalsIgnoreCase(session.path("currency").asText())
+				|| !operation.saleId().toString().equals(session.path("client_reference_id").asText())) {
+			return new CheckoutObservation(null, false);
+		}
+		String status = session.path("status").asText();
+		if (!"unpaid".equals(session.path("payment_status").asText())) return new CheckoutObservation(null, false);
+		JsonNode intent = session.path("payment_intent");
+		boolean noIntent = intent.isNull();
+		String intentStatus = intent.path("status").asText();
+		boolean noFunds = isZero(intent.path("amount_received")) && isZero(intent.path("amount_capturable"));
+		boolean canceled = "canceled".equals(intentStatus) && noFunds;
+		boolean needsMethod = "requires_payment_method".equals(intentStatus) && noFunds;
+		if (("expired".equals(status) && (noIntent || canceled || needsMethod)) || ("complete".equals(status) && canceled)) {
+			return new CheckoutObservation(null, true);
+		}
+		String url = text(session, "url");
+		boolean open = "open".equals(status) && url != null && !url.isBlank()
+				&& (noIntent || needsMethod);
+		return new CheckoutObservation(open ? url : null, false);
+	}
+
+	private boolean isZero(JsonNode amount) {
+		return amount.isIntegralNumber() && amount.canConvertToLong() && amount.longValue() == 0;
+	}
+
+	private CheckoutSessionResult checkoutResult(OperationRecord operation, CheckoutObservation observation, CreateOperationData data) {
+		String paymentState = providerRepository.checkoutPaymentState(data);
+		if (!"PENDING_VALIDATION".equals(paymentState)) return withoutCheckout(operation.id(), paymentState);
+		if (observation.url() != null) {
+			return new CheckoutSessionResult(operation.id(), operation.externalOperationId(), observation.url(), "OPEN");
+		}
+		providerRepository.requestCheckoutReconciliation(operation.id());
+		return withoutCheckout(operation.id(), "AWAITING_PAYMENT");
+	}
+
+	private CheckoutSessionResult withoutCheckout(UUID operationId, String status) {
+		return new CheckoutSessionResult(operationId, null, null, status);
+	}
+
+	private record CheckoutObservation(String url, boolean retryAllowed) {}
 
 	private String createConnectedAccount(GymOsPrincipal principal) {
 		Map<String, Object> body = PaymentProviderEncoding.values();
@@ -155,11 +239,25 @@ public class StripeProviderService implements StripeCheckoutOperations {
 		body.put("capabilities[card_payments][requested]", true);
 		body.put("capabilities[transfers][requested]", true);
 		body.put("metadata[gymos_organization_id]", principal.organizationId());
-		JsonNode response = http.exchange("POST", stripeUrl("/v1/accounts"), stripeHeaders(null),
+		JsonNode response = http.exchange("POST", stripeUrl("/v1/accounts"), stripeHeaders(null, "gymfort-connect:" + principal.organizationId()),
 				PaymentProviderEncoding.form(body), "application/x-www-form-urlencoded");
 		String accountId = requiredText(response, "id", "STRIPE_ACCOUNT_INVALID");
 		providerRepository.saveStripeAccount(principal.organizationId(), principal.userId(), accountId, false, json(response));
 		return accountId;
+	}
+
+	private void requireMatchingCheckout(OperationRecord operation, CreateCheckoutSessionCommand command) {
+		boolean matches = PROVIDER.equals(operation.provider()) && "CHECKOUT_SESSION".equals(operation.operationType())
+				&& Objects.equals(operation.organizationId(), command.organizationId())
+				&& Objects.equals(operation.branchId(), command.branchId())
+				&& Objects.equals(operation.clientId(), command.clientId())
+				&& Objects.equals(operation.saleId(), command.saleId())
+				&& Objects.equals(operation.paymentId(), command.paymentId())
+				&& operation.amountCents() == command.amountCents()
+				&& operation.currency().equals(normalizeCurrency(command.currency()));
+		if (!matches) {
+			throw new BusinessException("STRIPE_CHECKOUT_CONTEXT_MISMATCH", "La operación de Stripe no corresponde a este pago.");
+		}
 	}
 
 	private void validateCheckout(CreateCheckoutSessionCommand command) {
@@ -216,10 +314,6 @@ public class StripeProviderService implements StripeCheckoutOperations {
 
 	private String safeDescription(String description) {
 		return description == null || description.isBlank() ? "Membresia GymOS" : description.trim();
-	}
-
-	private boolean retryableTerminal(String status) {
-		return status != null && java.util.Set.of("EXPIRED", "CANCELED", "CANCELLED", "REJECTED", "FAILED").contains(status.toUpperCase());
 	}
 
 	private void requireTenant(GymOsPrincipal principal) {

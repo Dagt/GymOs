@@ -179,6 +179,7 @@ public class SelfServiceService {
 	public SelfServiceSummaryResult verify(UUID sessionId, String sessionToken, VerifySessionCommand request, String correlationId, String originIp) {
 		rateLimiter.check("kiosk:verify:ip:" + originIp, 60, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:verify:session:" + sessionId, 10, Duration.ofMinutes(1));
+		repository.lockSession(sessionId);
 		SessionRecord session = activeSession(sessionId, sessionToken);
 		rateLimiter.check(
 				"kiosk:verify:identity:" + session.terminalId() + ":" + tokenHash(request.identifier().trim().toLowerCase()),
@@ -186,10 +187,14 @@ public class SelfServiceService {
 				Duration.ofMinutes(10)
 		);
 		ensureNotBlocked(session);
+		var client = clientLookupOperations.verifyForSelfService(new VerifyClientIdentityCommand(
+				session.organizationId(), session.branchId(), request.identifier(), request.birthDate())).orElse(null);
 		if (session.clientId() != null) {
-			return summary(sessionId, sessionToken);
+			if (client != null && session.clientId().equals(client.clientId())) {
+				return summary(sessionId, sessionToken);
+			}
+			throw new BusinessException("SELF_SERVICE_SESSION_ALREADY_VERIFIED", "Cierra la sesion actual antes de verificar otro socio.");
 		}
-		var client = clientLookupOperations.verifyForSelfService(new VerifyClientIdentityCommand(session.organizationId(), session.branchId(), request.identifier(), request.birthDate())).orElse(null);
 		if (client == null) {
 			recordFailedVerification(session, correlationId);
 			throw new BusinessException("SELF_SERVICE_VERIFICATION_FAILED", "No fue posible verificar la sesion con los datos proporcionados.");
@@ -213,6 +218,7 @@ public class SelfServiceService {
 	) {
 		rateLimiter.check("kiosk:register:ip:" + originIp, 20, Duration.ofMinutes(10));
 		rateLimiter.check("kiosk:register:session:" + sessionId, 5, Duration.ofMinutes(10));
+		repository.lockSession(sessionId);
 		SessionRecord session = activeSession(sessionId, sessionToken);
 		capabilityPolicy.require(capabilities(session), SelfServiceCapability.CLIENT_REGISTRATION);
 		if (session.clientId() != null) {
@@ -336,7 +342,7 @@ public class SelfServiceService {
 						"Paquete de visitas con tarjeta desde kiosco", idempotencyKey),
 				correlationId);
 		StripeCheckoutOperations.CheckoutSessionResult checkout = purchase.balanceCents() > 0
-				? stripeCheckout(session, purchase, "Paquete de visitas", idempotencyKey)
+				? stripeCheckout(session, purchase, "Paquete de visitas")
 				: null;
 		auditService.recordSystem(
 				session.organizationId(), session.branchId(), null,
@@ -346,7 +352,8 @@ public class SelfServiceService {
 				purchase.entitlementId(), purchase.saleId(), purchase.paymentId(), purchase.saleNumber(),
 				purchase.saleStatus(), purchase.entitlementStatus(), purchase.totalCents(), purchase.paidCents(),
 				purchase.balanceCents(), purchase.currency(), checkout == null ? null : checkout.operationId(),
-				checkout == null ? null : checkout.checkoutUrl(), checkout == null ? null : checkout.status());
+				checkout == null ? null : checkout.checkoutUrl(), checkout == null ? null : checkout.status(),
+				checkout == null ? null : checkout.providerSessionId());
 	}
 
 	@Transactional
@@ -396,7 +403,7 @@ public class SelfServiceService {
 		capabilityPolicy.requireOnlineCardPayments(capabilities);
 		requireMembershipManagedAtCurrentBranch(session, membershipId);
 		MembershipSaleOperationResult response = membershipOperations.renew(kioskPrincipal(session), membershipId, request, correlationId);
-		var checkout = stripeCheckout(session, response, "Renovacion de membresia", request.idempotencyKey());
+		var checkout = response.balanceCents() > 0 ? stripeCheckout(session, response, "Renovacion de membresia") : null;
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_CHECKOUT_STARTED", "SALE", response.saleId(), "SELF_SERVICE_KIOSK", null, correlationId);
 		return toResponse(response, checkout);
 	}
@@ -429,7 +436,7 @@ public class SelfServiceService {
 				),
 				correlationId
 		);
-		var checkout = stripeCheckout(session, response, "Contratacion de membresia", idempotencyKey);
+		var checkout = response.balanceCents() > 0 ? stripeCheckout(session, response, "Contratacion de membresia") : null;
 		auditService.recordSystem(session.organizationId(), session.branchId(), null,
 				"SELF_SERVICE_MEMBERSHIP_CHECKOUT_STARTED", "SALE", response.saleId(),
 				"SELF_SERVICE_KIOSK", "ENROLLMENT", correlationId);
@@ -446,7 +453,7 @@ public class SelfServiceService {
 		requireMembershipManagedAtCurrentBranch(session, membershipId);
 		requirePlanAvailableForSelfService(session, request.targetPlanId());
 		MembershipSaleOperationResult response = membershipOperations.changePlan(kioskPrincipal(session), membershipId, request, correlationId);
-		var checkout = stripeCheckout(session, response, "Cambio de plan de membresia", request.idempotencyKey());
+		var checkout = response.balanceCents() > 0 ? stripeCheckout(session, response, "Cambio de plan de membresia") : null;
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_CHECKOUT_STARTED", "SALE", response.saleId(), "SELF_SERVICE_KIOSK", null, correlationId);
 		return toResponse(response, checkout);
 	}
@@ -555,27 +562,59 @@ public class SelfServiceService {
 		return profile;
 	}
 
+	public RecoveredCheckout recoverCheckout(UUID sessionId, String sessionToken, UUID paymentId, String correlationId) {
+		rateLimiter.check("kiosk:checkout-recover:" + sessionId, 10, Duration.ofMinutes(1));
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		var payment = repository.recoverableCheckout(session.organizationId(), session.branchId(), session.clientId(), paymentId)
+				.orElseThrow(() -> new BusinessException("SELF_SERVICE_CHECKOUT_NOT_AVAILABLE", "El pago no está disponible para continuar."));
+		if ("COMPLETED".equals(payment.paymentStatus())) {
+			return new RecoveredCheckout(payment.saleId(), paymentId, null, null, "COMPLETED");
+		}
+		var capabilities = capabilities(session);
+		String description = switch (payment.context()) {
+			case "MEMBERSHIP_ENROLLMENT" -> checkoutDescription(capabilities, SelfServiceCapability.MEMBERSHIP_ENROLLMENT, "Contratacion de membresia");
+			case "MEMBERSHIP_RENEWAL" -> checkoutDescription(capabilities, SelfServiceCapability.MEMBERSHIP_RENEWAL, "Renovacion de membresia");
+			case "MEMBERSHIP_PLAN_CHANGE" -> checkoutDescription(capabilities, SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE, "Cambio de plan de membresia");
+			case "VISIT_PACKAGE_PURCHASE" -> checkoutDescription(capabilities, SelfServiceCapability.VISIT_PACKAGE_PURCHASE, "Paquete de visitas");
+			case null, default -> throw new BusinessException("SELF_SERVICE_CHECKOUT_NOT_AVAILABLE", "El pago no está disponible para continuar.");
+		};
+		capabilityPolicy.requireOnlineCardPayments(capabilities);
+		var checkout = stripeCheckoutOperations.createCheckout(new StripeCheckoutOperations.CreateCheckoutSessionCommand(
+				session.organizationId(), session.branchId(), session.clientId(), payment.saleId(), paymentId,
+				payment.amountCents(), payment.currency(), false, description, "stripe-checkout:" + paymentId));
+		if (checkout.checkoutUrl() != null) {
+			auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_CHECKOUT_RECOVERED",
+					"PAYMENT", paymentId, "SELF_SERVICE_KIOSK", checkout.operationId().toString(), correlationId);
+		}
+		return new RecoveredCheckout(payment.saleId(), paymentId, checkout.providerSessionId(), checkout.checkoutUrl(), checkout.status());
+	}
+
+	private String checkoutDescription(SelfServiceCapabilities capabilities, SelfServiceCapability capability, String description) {
+		capabilityPolicy.require(capabilities, capability);
+		return description;
+	}
+
+	public record RecoveredCheckout(UUID saleId, UUID paymentId, String providerSessionId, String checkoutUrl, String status) {}
+
 	private StripeCheckoutOperations.CheckoutSessionResult stripeCheckout(
 			SessionRecord session,
 			MembershipSaleOperationResult sale,
-			String description,
-			String idempotencyKey
+			String description
 	) {
 		return stripeCheckoutOperations.createCheckout(new StripeCheckoutOperations.CreateCheckoutSessionCommand(
 				session.organizationId(), session.branchId(), session.clientId(), sale.saleId(), sale.paymentId(),
-				sale.balanceCents(), sale.currency(), false, description, "stripe:" + idempotencyKey
+				sale.balanceCents(), sale.currency(), false, description, "stripe-checkout:" + sale.paymentId()
 		));
 	}
 
 	private StripeCheckoutOperations.CheckoutSessionResult stripeCheckout(
 			SessionRecord session,
 			VisitPackagePurchaseResult sale,
-			String description,
-			String idempotencyKey
+			String description
 	) {
 		return stripeCheckoutOperations.createCheckout(new StripeCheckoutOperations.CreateCheckoutSessionCommand(
 				session.organizationId(), session.branchId(), session.clientId(), sale.saleId(), sale.paymentId(),
-				sale.balanceCents(), sale.currency(), false, description, "stripe:" + idempotencyKey
+				sale.balanceCents(), sale.currency(), false, description, "stripe-checkout:" + sale.paymentId()
 		));
 	}
 
@@ -606,12 +645,15 @@ public class SelfServiceService {
 						result.membership().status(), result.membership().activatedAt(), result.membership().startsOn(),
 						result.membership().endsOn(), result.membership().graceEndsOn()
 				),
-				result.paymentId(), checkout.operationId(), checkout.checkoutUrl(), checkout.status()
+				result.paymentId(), checkout == null ? null : checkout.operationId(),
+				checkout == null ? null : checkout.checkoutUrl(), checkout == null ? null : checkout.status(),
+				checkout == null ? null : checkout.providerSessionId()
 		);
 	}
 
 	@Transactional
 	public void end(UUID sessionId, String sessionToken, String correlationId) {
+		repository.lockSession(sessionId);
 		SessionRecord session = activeSession(sessionId, sessionToken);
 		repository.endSession(sessionId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_SESSION_ENDED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", null, correlationId);
@@ -619,10 +661,12 @@ public class SelfServiceService {
 
 	@Transactional
 	public CreateSessionResult reset(UUID sessionId, String sessionToken, String correlationId) {
+		repository.lockSession(sessionId);
 		SessionRecord session = kioskBrowserSession(sessionId, sessionToken);
 		OffsetDateTime now = OffsetDateTime.now();
+		String replacementToken = randomToken();
 		OffsetDateTime browserExpiresAt = session.startedAt().plus(BROWSER_MODE_MAX_DURATION);
-		repository.resetSession(session.id(), now, browserExpiresAt);
+		repository.resetSession(session.id(), tokenHash(replacementToken), now, browserExpiresAt);
 		auditService.recordSystem(
 				session.organizationId(),
 				session.branchId(),
@@ -638,7 +682,7 @@ public class SelfServiceService {
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_TERMINAL_NOT_FOUND", "El kiosco ya no esta disponible."));
 		return new CreateSessionResult(
 				session.id(),
-				sessionToken,
+				replacementToken,
 				terminal.name(),
 				terminal.tradeName(),
 				terminal.brandName(),

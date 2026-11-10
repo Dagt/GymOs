@@ -15,5 +15,6 @@ public record SelfServiceVisitPackageSaleResult(
 		String currency,
 		UUID providerOperationId,
 		String checkoutUrl,
-		String checkoutStatus
+		String checkoutStatus,
+		String providerSessionId
 ) {}

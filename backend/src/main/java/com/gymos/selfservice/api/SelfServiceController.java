@@ -245,6 +245,15 @@ public class SelfServiceController {
 		);
 	}
 
+	@PostMapping("/sessions/{sessionId}/payments/{paymentId}/checkout")
+	SelfServiceService.RecoveredCheckout recoverCheckout(
+			@PathVariable UUID sessionId, @PathVariable UUID paymentId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
+			HttpServletRequest request
+	) {
+		return selfServiceService.recoverCheckout(sessionId, sessionToken, paymentId, correlationId(request));
+	}
+
 	@PostMapping("/sessions/{sessionId}/end") @ResponseStatus(HttpStatus.NO_CONTENT)
 	void end(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) { selfServiceService.end(sessionId, sessionToken, correlationId(servletRequest)); }
 
@@ -277,7 +286,7 @@ public class SelfServiceController {
 	private String correlationId(HttpServletRequest request) { Object value = request.getAttribute(Correlation.ATTRIBUTE); return value == null ? "unknown" : value.toString(); }
 	private CreateSessionResponse toResponse(CreateSessionResult result) { return new CreateSessionResponse(result.sessionId(), result.sessionToken(), result.terminalName(), result.organizationName(), result.brandName(), result.logoUrl(), result.primaryColor(), result.accentColor(), result.surfaceColor(), result.expiresAt(), result.verified(), result.capabilities()); }
 	private SelfServiceSummaryResponse toResponse(SelfServiceSummaryResult result) { return new SelfServiceSummaryResponse(result.sessionId(), result.expiresAt(), result.clientName(), result.profile(), result.capabilities(), result.memberships(), result.pendingPayments(), result.paymentActivity()); }
-	private SelfServiceMembershipSaleResponse toResponse(SelfServiceMembershipSaleResult result) { return new SelfServiceMembershipSaleResponse(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership(), result.paymentId(), result.providerOperationId(), result.checkoutUrl(), result.checkoutStatus()); }
+	private SelfServiceMembershipSaleResponse toResponse(SelfServiceMembershipSaleResult result) { return new SelfServiceMembershipSaleResponse(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership(), result.paymentId(), result.providerOperationId(), result.checkoutUrl(), result.checkoutStatus(), result.providerSessionId()); }
 
 	public record VerifySessionRequest(@NotBlank String identifier, @NotNull LocalDate birthDate) { private VerifySessionCommand toCommand() { return new VerifySessionCommand(identifier, birthDate); } }
 	public record RegisterClientRequest(
@@ -317,5 +326,5 @@ public class SelfServiceController {
 	) {}
 	public record CreateSessionResponse(UUID sessionId, String sessionToken, String terminalName, String organizationName, String brandName, String logoUrl, String primaryColor, String accentColor, String surfaceColor, OffsetDateTime expiresAt, boolean verified, SelfServiceCapabilities capabilities) {}
 	public record SelfServiceSummaryResponse(UUID sessionId, OffsetDateTime expiresAt, String clientName, SelfServiceClientProfile profile, SelfServiceCapabilities capabilities, List<MembershipRecord> memberships, List<PendingPaymentRecord> pendingPayments, List<SelfServicePaymentRecord> paymentActivity) {}
-	public record SelfServiceMembershipSaleResponse(UUID saleId, String saleNumber, String saleStatus, long totalCents, long paidCents, long balanceCents, String currency, com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult membership, UUID paymentId, UUID providerOperationId, String checkoutUrl, String checkoutStatus) {}
+	public record SelfServiceMembershipSaleResponse(UUID saleId, String saleNumber, String saleStatus, long totalCents, long paidCents, long balanceCents, String currency, com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult membership, UUID paymentId, UUID providerOperationId, String checkoutUrl, String checkoutStatus, String providerSessionId) {}
 }
