@@ -19,10 +19,13 @@ export function InventoryProductPicker({ accessToken, selected, onChange, allowC
   const [query, setQuery] = useState("");
   const list = usePaginatedQuery<InventoryStock, InventoryStockSearchParams>(accessToken, searchInventoryStock, { sort: "name,asc" }, DEFAULT_PAGE_SIZE, open);
   const setFilters = list.setFilters;
+  const appliedQuery = list.filters.q ?? "";
   useEffect(() => {
-    const timer = window.setTimeout(() => setFilters({ q: query.trim(), sort: "name,asc" }), 250);
+    const search = query.trim();
+    if (search === appliedQuery) return;
+    const timer = window.setTimeout(() => setFilters({ q: search, sort: "name,asc" }), 250);
     return () => window.clearTimeout(timer);
-  }, [query, setFilters]);
+  }, [appliedQuery, query, setFilters]);
 
   return (
     <fieldset className="grid min-w-0 gap-2" disabled={disabled}>

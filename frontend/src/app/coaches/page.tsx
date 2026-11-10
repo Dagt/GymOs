@@ -288,10 +288,13 @@ export default function CoachesPage() {
   }, [clientQuery, session]);
 
   const updateExerciseFilters = exerciseList.setFilters;
+  const appliedExerciseQuery = exerciseList.filters.query ?? "";
   useEffect(() => {
-    const timer = window.setTimeout(() => updateExerciseFilters({ query: exerciseQuery.trim() }), 300);
+    const query = exerciseQuery.trim();
+    if (query === appliedExerciseQuery) return;
+    const timer = window.setTimeout(() => updateExerciseFilters({ query }), 300);
     return () => window.clearTimeout(timer);
-  }, [exerciseQuery, updateExerciseFilters]);
+  }, [appliedExerciseQuery, exerciseQuery, updateExerciseFilters]);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId);
   const equipmentOptions = useMemo(() => {
