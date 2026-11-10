@@ -219,9 +219,11 @@ public class PaymentWebhookService {
 	}
 
 	private void recordUnpaidStripeCheckout(OperationRecord operation, JsonNode session) {
-		String status = providerStatus(session, "OPEN");
+		String status = "unpaid".equals(session.path("payment_status").asText())
+				? providerStatus(session, "AWAITING_PAYMENT") : "AWAITING_PAYMENT";
+		if (!java.util.Set.of("OPEN", "EXPIRED", "COMPLETE").contains(status)) status = "AWAITING_PAYMENT";
 		String intentStatus = session.path("payment_intent").path("status").asText();
-		if ("COMPLETE".equals(status) && "unpaid".equals(session.path("payment_status").asText())
+		if ("COMPLETE".equals(status)
 				&& java.util.Set.of("requires_payment_method", "canceled").contains(intentStatus)) {
 			status = "FAILED";
 		}

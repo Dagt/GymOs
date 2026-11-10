@@ -1690,7 +1690,11 @@ function autopayStatusLabel(status: KioskAutopayMandate["status"]) {
   return ({ ACTIVE: "Domiciliación activa", PAST_DUE: "Pago pendiente", PAUSED: "Domiciliación pausada" } as Record<string, string>)[status] ?? status;
 }
 function paymentStatusLabel(status: string) {
-  return ({ COMPLETED: "Pagado", REJECTED: "Rechazado", OPEN: "Pendiente de completar", EXPIRED: "Sesión vencida", FAILED: "No completado", PENDING_VALIDATION: "Confirmando con Stripe" } as Record<string, string>)[status] ?? status;
+  return ({
+    COMPLETED: "Pagado", REJECTED: "Rechazado", OPEN: "Pendiente de completar", EXPIRED: "Sesión vencida",
+    FAILED: "No completado", CREATING: "Inicio pendiente", PENDING_VALIDATION: "Confirmando con Stripe",
+    COMPLETE: "Confirmando con Stripe", AWAITING_PAYMENT: "Pendiente de conciliación",
+  } as Record<string, string>)[status] ?? status;
 }
 function paymentStatusTone(status: string) {
   return ["REJECTED", "FAILED", "EXPIRED", "CANCELLED"].includes(status) ? "text-sm font-semibold text-[#8c2f2f]" : "text-sm font-semibold text-[var(--brand-primary)]";
