@@ -32,6 +32,11 @@ un UUID por operación y lo conserva en el reintento del mismo payload. La
 prueba HTTP/PostgreSQL reproduce el rechazo y comprueba venta, pago, vigencia,
 saldo y auditoría. ACC-005 conserva la aceptación conectada pendiente.
 
+**Método de pago en paquetes · RESUELTA en PR #71.** El DTO de mostrador
+aceptaba texto arbitrario. Se añadió una lista de métodos permitidos y una
+regresión HTTP/PostgreSQL que comprueba el rechazo antes de persistir la venta.
+La aceptación de Point con terminal conectada sigue pendiente.
+
 ## 2. Deuda activa
 
 | ID | Pri. | Módulo | Estado | Hallazgo e impacto | Criterio de cierre |

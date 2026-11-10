@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AppNotice } from "@/components/AppNotice";
 import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
+import { ReceptionPointRecovery, useReceptionPoint } from "@/components/ReceptionPointRecovery";
+import { runSaleWrite } from "@/lib/sale-write";
 import { VisitPackageCard } from "@/components/VisitPackageCard";
 import { currentMembership } from "@/app/clients/[clientId]/client-membership-helpers";
 import { resolveClientMembershipCapabilities } from "@/app/clients/[clientId]/client-membership-permissions";
 import { contractErrorMessage } from "@/lib/contract-error";
 import {
   changeMembershipPlan,
-  createMercadoPagoPointOrder,
   enrollMembership,
   getClientMemberships,
   getMembershipQuote,
@@ -40,6 +41,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
   onClear: () => void;
 }) {
   const token = session.accessToken;
+  const point = useReceptionPoint(session, client.id, "membership");
   const clientName = [client.firstName, client.lastName, client.maternalLastName].filter(Boolean).join(" ");
   const capabilities = resolveClientMembershipCapabilities(session.user);
   const canReadPaymentSettings = session.user.permissions.some((permission) =>
@@ -59,7 +61,6 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const inFlight = useRef(false);
-  const attempt = useRef<{ signature: string; key: string } | null>(null);
   const targetPlanId = operation === "renew" ? membership?.planId : selectedPlanId;
   const visibleQuote = quote?.planId === targetPlanId ? quote : null;
   const eligiblePlans = plans.filter((plan) => operation !== "change" || plan.id !== membership?.planId);
@@ -108,36 +109,33 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || !operation || !targetPlanId || !visibleQuote || !actionAllowed(operation)) return;
+    if (inFlight.current || point.pending || !operation || !targetPlanId || !visibleQuote || !actionAllowed(operation)) return;
     inFlight.current = true;
     setProcessing(true);
     onBusyChange(true);
     setError(null);
     const paymentReference = usesReference ? reference.trim() || null : null;
-    const signature = JSON.stringify([operation, membership?.id, targetPlanId, method, paymentReference]);
-    const key = attempt.current?.signature === signature ? attempt.current.key : crypto.randomUUID();
-    attempt.current = { signature, key };
     try {
       const payment = {
         method,
         reference: paymentReference,
         validateNow: method !== "CARD_MERCADO_PAGO",
         notes: `${operationLabels[operation]} desde recepción`,
-        idempotencyKey: key,
       };
-      const result = operation === "enroll"
-        ? await enrollMembership(token, { ...payment, clientId: client.id, planId: targetPlanId })
+      const write = (idempotencyKey: string) => operation === "enroll"
+        ? enrollMembership(token, { ...payment, idempotencyKey, clientId: client.id, planId: targetPlanId })
         : operation === "change" && membership
-          ? await changeMembershipPlan(token, membership.id, { ...payment, targetPlanId })
-          : await renewMembership(token, membership!.id, payment);
-      if (method === "CARD_MERCADO_PAGO") {
-        if (!result.paymentId) throw new Error(`La venta ${result.saleNumber} se registró sin un pago para enviar a Point.`);
-        await createMercadoPagoPointOrder(token, result.paymentId);
-      }
+          ? changeMembershipPlan(token, membership.id, { ...payment, idempotencyKey, targetPlanId })
+          : renewMembership(token, membership!.id, { ...payment, idempotencyKey });
+      const result = await runSaleWrite(session, `reception-membership:${client.id}`,
+        { ...payment, operation, membershipId: membership?.id, targetPlanId }, write);
       selectOperation(null);
-      attempt.current = null;
       setReference("");
       setMethod("CASH");
+      if (method === "CARD_MERCADO_PAGO" && result.saleStatus === "PENDING_PAYMENT") {
+        await sendPoint(result);
+        return;
+      }
       setMessage(result.saleStatus === "PAID"
         ? `Operación confirmada. Venta ${result.saleNumber}.`
         : `Venta ${result.saleNumber} registrada. La membresía se actualizará al confirmar el pago.`);
@@ -156,8 +154,29 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
     }
   }
 
+  async function sendPoint(sale: Parameters<typeof point.send>[0]) {
+    setError(null);
+    onBusyChange(true);
+    try {
+      const message = await point.send(sale);
+      if (message) {
+        setMessage(message);
+        try {
+          setMembership(currentMembership(await getClientMemberships(token, client.id)));
+        } catch {
+          setMembership(undefined);
+          setError("La venta está registrada. Vuelve a seleccionar al socio para actualizar la membresía.");
+        }
+      }
+    } catch (exception) {
+      setError(contractErrorMessage(exception, "Consulta el estado de la venta en el historial."));
+    } finally {
+      onBusyChange(false);
+    }
+  }
+
   function actionAllowed(action: Operation) {
-    if (loading || membership === undefined) return false;
+    if (point.pending || loading || membership === undefined) return false;
     if (action === "enroll") return capabilities.canEnroll && !membership;
     if (action === "renew") return capabilities.canRenew && Boolean(membership);
     return capabilities.canChange && membership?.status === "ACTIVE";
@@ -172,7 +191,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
             <h2 className="app-card-title">{clientName}</h2>
             <p className="text-sm text-[var(--brand-muted)]">Estado: {clientStatus[client.status]}</p>
           </div>
-          <button className="app-button-secondary" disabled={processing} onClick={onClear} type="button">Cambiar socio</button>
+          <button className="app-button-secondary" disabled={processing || point.sending} onClick={onClear} type="button">Cambiar socio</button>
         </div>
         <div className="rounded-lg bg-[var(--brand-surface)] p-4">
           <h3 className="app-eyebrow">Membresía actual</h3>
@@ -185,6 +204,9 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
         </div>
         {message ? <AppNotice message={message} tone="success" /> : null}
         {error ? <AppNotice message={error} tone="error" /> : null}
+        {point.pending && capabilities.canEnroll ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
+          canReadSale={session.user.permissions.includes("sale.read")}
+          onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
         {capabilities.canManage ? (
           <div className="flex flex-wrap gap-2" aria-label="Operaciones de membresía">
             {(Object.keys(operationLabels) as Operation[]).map((action) => (

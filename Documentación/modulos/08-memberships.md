@@ -66,7 +66,10 @@ También se puede abrir desde el menú lateral. La pantalla busca al socio,
 muestra la membresía y el saldo del paquete, y cotiza las operaciones
 habilitadas por los permisos de la sesión. La ficha y recepción comparten
 el formulario de venta de paquetes. Los marcadores de `/reception/renewals`
-redirigen al nuevo espacio.
+redirigen al nuevo espacio. El API de paquetes de mostrador admite efectivo,
+transferencia, tarjeta manual y Point. Si Point falla después de registrar
+la venta, recepción recupera el envío con el identificador del pago existente.
+La operación sigue pendiente hasta que el servidor confirma o cierra el pago.
 
 ## Planes de visita diaria y paquetes
 

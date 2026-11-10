@@ -153,6 +153,19 @@ class TenantIsolationPostgresIntegrationTests {
 	}
 
 	@Test
+	void receptionSearchRequiresAnExistingClientSearchAuthority() throws Exception {
+		tenant.client();
+		for (String permission : Set.of("client.read", "client.create", "client.update",
+				"membership.read", "membership.create", "membership.update")) {
+			String reception = token(tenant.ownerId, tenant.branchId, Set.of(permission, "sale.create"), "Recepcion");
+			http.perform(auth(get("/api/v1/clients").param("query", "Socio"), reception))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+		}
+		String salesOnly = token(tenant.ownerId, tenant.branchId, Set.of("sale.create"), "Recepcion");
+		http.perform(auth(get("/api/v1/clients").param("query", "Socio"), salesOnly)).andExpect(status().isForbidden());
+	}
+
+	@Test
 	void packagePurchaseRejectsOldBrowserKeyAndPersistsOneSaleWithTheCorrectedKey() throws Exception {
 		UUID client = tenant.client();
 		UUID benefit = UUID.randomUUID();
@@ -191,9 +204,11 @@ class TenantIsolationPostgresIntegrationTests {
 						.content(request.formatted(client, plan, "CASH", oldKey)))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
 				.andExpect(jsonPath("$.details.idempotencyKey").exists()).andExpect(jsonPath("$.correlationId").exists());
-		http.perform(auth(post(endpoint), reception).contentType("application/json")
-						.content(request.formatted(client, plan, "", key)))
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.method").exists());
+		for (String method : Set.of("", "UNSUPPORTED", "CARD_ONLINE")) {
+			http.perform(auth(post(endpoint), reception).contentType("application/json")
+							.content(request.formatted(client, plan, method, key)))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.method").exists());
+		}
 		http.perform(auth(post(endpoint), reception).contentType("application/json")
 						.content(request.formatted(client, UUID.randomUUID(), "CASH", key)))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VISIT_PACKAGE_PLAN_NOT_AVAILABLE"));

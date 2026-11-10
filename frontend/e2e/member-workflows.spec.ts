@@ -312,7 +312,7 @@ test("la ficha vende el paquete con una clave válida y actualiza su historial",
   await expect(page.getByRole("heading", { name: "Historial de paquetes" })).toBeVisible();
   expect(purchases).toHaveLength(1);
   expect(purchases[0]).toMatchObject({ clientId, packagePlanId, method: "CASH", reference: null });
-  expect(purchases[0].idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
 });
 
 async function bootMemberWorkflow(

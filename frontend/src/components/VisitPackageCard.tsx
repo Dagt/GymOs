@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { ReceptionPointRecovery, useReceptionPoint } from "@/components/ReceptionPointRecovery";
+import { runSaleWrite } from "@/lib/sale-write";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppNotice } from "@/components/AppNotice";
 import { contractErrorMessage } from "@/lib/contract-error";
 import {
-  createMercadoPagoPointOrder,
   getCurrentVisitPackage,
   getVisitPackageHistory,
   getPaymentConfiguration,
@@ -30,6 +32,7 @@ export function VisitPackageCard({
   session: StoredSession;
   source?: "profile" | "reception";
 }) {
+  const point = useReceptionPoint(session, clientId, "package");
   const [plans, setPlans] = useState<VisitPackagePlanSummary[]>([]);
   const [current, setCurrent] = useState<VisitPackageEntitlement | null>(null);
   const [history, setHistory] = useState<VisitPackageEntitlement[]>([]);
@@ -45,7 +48,6 @@ export function VisitPackageCard({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const inFlight = useRef(false);
-  const attempt = useRef<{ planId: string; method: typeof method; reference: string; key: string } | null>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
   const visibleQuote = quote?.packagePlanId === selectedPlanId ? quote : null;
   const usesReference = method === "TRANSFER" || method === "CARD_MANUAL";
@@ -101,54 +103,61 @@ export function VisitPackageCard({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || !canSell || !visibleQuote || current || refreshFailed) return;
+    if (inFlight.current || !canSell || point.pending || !visibleQuote || current || refreshFailed) return;
     inFlight.current = true;
     setSaving(true);
     setError(null);
     const paymentReference = usesReference ? reference.trim() : "";
-    const previous = attempt.current;
-    const key = previous?.planId === selectedPlanId && previous.method === method && previous.reference === paymentReference
-      ? previous.key
-      : crypto.randomUUID();
-    attempt.current = { planId: selectedPlanId, method, reference: paymentReference, key };
     try {
-      const result = await purchaseVisitPackage(session.accessToken, {
+      const payload = {
         clientId,
         packagePlanId: selectedPlanId,
         method,
         reference: paymentReference || null,
         validateNow: method !== "CARD_MERCADO_PAGO",
-        notes: source === "profile" ? "Venta desde ficha de socio" : "Venta desde recepción",
-        idempotencyKey: key,
-      });
-      if (method === "CARD_MERCADO_PAGO") {
-        if (!result.paymentId) throw new Error("La venta no devolvió un pago para enviar a Point.");
-        try {
-          await createMercadoPagoPointOrder(session.accessToken, result.paymentId);
-        } catch (exception) {
-          setError(`La venta ${result.saleNumber} está pendiente. ${contractErrorMessage(exception, "No fue posible enviar el cobro a Point.")}`);
-          return;
-        }
-      }
+        notes: "Venta de paquete de visitas",
+      };
+      const result = await runSaleWrite(session, `reception-package:${clientId}`, payload,
+        (idempotencyKey) => purchaseVisitPackage(session.accessToken, { ...payload, idempotencyKey }));
       setOpen(false);
-      attempt.current = null;
       setReference("");
       setMethod("CASH");
+      if (method === "CARD_MERCADO_PAGO" && result.saleStatus === "PENDING_PAYMENT") {
+        await sendPoint(result);
+        return;
+      }
       setMessage(result.entitlementStatus === "ACTIVE"
         ? `Paquete activado. Venta ${result.saleNumber}.`
         : `Venta ${result.saleNumber} creada; el paquete se activará al confirmar el pago.`);
-      try {
-        setCurrent(await getCurrentVisitPackage(session.accessToken, clientId));
-        if (source === "profile") setHistory(await getVisitPackageHistory(session.accessToken, clientId));
-      } catch (exception) {
-        setRefreshFailed(true);
-        setError(contractErrorMessage(exception, "Recarga la página para consultar el saldo actualizado."));
-      }
+      await refreshPackage();
     } catch (exception) {
       setError(contractErrorMessage(exception, "No fue posible vender el paquete."));
     } finally {
       inFlight.current = false;
       setSaving(false);
+    }
+  }
+
+  async function refreshPackage() {
+    try {
+      setCurrent(await getCurrentVisitPackage(session.accessToken, clientId));
+      if (source === "profile") setHistory(await getVisitPackageHistory(session.accessToken, clientId));
+      setRefreshFailed(false);
+    } catch (exception) {
+      setRefreshFailed(true);
+      setError(contractErrorMessage(exception, "Recarga la página para consultar el saldo actualizado."));
+    }
+  }
+
+  async function sendPoint(sale: Parameters<typeof point.send>[0]) {
+    setError(null);
+    try {
+      const message = await point.send(sale);
+      if (message) setMessage(message);
+    } catch (exception) {
+      setError(contractErrorMessage(exception, "Consulta el estado de la venta en el historial."));
+    } finally {
+      await refreshPackage();
     }
   }
 
@@ -160,9 +169,12 @@ export function VisitPackageCard({
             <p className="app-eyebrow">Accesos consumibles</p>
             <h2 className="app-card-title">Paquete de visitas</h2>
           </div>
-          {canSell && !current ? <button className="app-button h-9" disabled={loading || saving || refreshFailed || plans.length === 0} type="button" onClick={beginPurchase}>{source === "reception" ? "Vender paquete de visitas" : "Vender paquete"}</button> : null}
+          {canSell && !current && !point.pending ? <button className="app-button h-9" disabled={loading || saving || refreshFailed || plans.length === 0} type="button" onClick={beginPurchase}>{source === "reception" ? "Vender paquete de visitas" : "Vender paquete"}</button> : null}
         </div>
         {error && !open ? <AppNotice message={error} tone="error" /> : null}
+        {point.pending && canSell ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
+          canReadSale={hasPermission(session, "sale.read")}
+          onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
         {message ? <AppNotice message={message} tone="success" /> : null}
         {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando saldo...</p> : null}
         {!loading && current ? (
@@ -174,6 +186,9 @@ export function VisitPackageCard({
             {current.status === "ACTIVE" ? (
               <p className="mt-2 text-2xl font-semibold text-[var(--brand-primary)]">{current.remainingVisits} <span className="text-sm font-normal text-[var(--brand-muted)]">de {current.totalVisits} visitas</span></p>
             ) : <p className="mt-2 text-sm text-[var(--brand-muted)]">El pago está pendiente; no consume visitas todavía.</p>}
+            {current.status === "PENDING_PAYMENT" && !point.pending && hasPermission(session, "sale.read") ? (
+              <Link className="mt-2 inline-block text-sm underline" href={`/sales/${current.saleId}`}>Consultar venta</Link>
+            ) : null}
             {current.validUntil ? <p className="mt-1 text-xs text-[var(--brand-muted)]">Vigente hasta {formatDate(current.validUntil)}.</p> : null}
           </div>
         ) : null}

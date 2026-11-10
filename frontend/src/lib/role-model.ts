@@ -139,10 +139,12 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
 }
 
 export function canManageReceptionMemberships(permissions: ReadonlySet<string>) {
-  const canReadClients = permissions.has("client.read") || permissions.has("membership.read");
+  // GET /clients grants search through any of these authorities.
+  const canSearchClients = ["client.read", "client.create", "client.update", "membership.read", "membership.create", "membership.update"]
+    .some((permission) => permissions.has(permission));
   const canMaintainMembership = permissions.has("membership.read")
     && (permissions.has("membership.renew") || permissions.has("membership.change-plan"));
-  return canReadClients && (permissions.has("sale.create") || canMaintainMembership);
+  return canSearchClients && (permissions.has("sale.create") || canMaintainMembership);
 }
 
 export function canRegisterCheckIn(user: CurrentUser) {

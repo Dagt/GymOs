@@ -100,7 +100,7 @@ export default function ClientDetailPage() {
           ) : null}
           {controller.canReadMemberships ? (
             <VisitPackageCard
-              key={controller.data.client.id}
+              key={`${controller.session.user.branchId}:${controller.data.client.id}`}
               clientId={controller.data.client.id}
               clientName={clientFullName(controller.data.client)}
               session={controller.session}
