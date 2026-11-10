@@ -134,7 +134,7 @@ async function performRequest(path: string, init: RequestInit): Promise<Response
 }
 
 export class ApiResponseError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly payload?: ApiErrorPayload) {
     super(message);
   }
 }
@@ -142,7 +142,8 @@ export class ApiResponseError extends Error {
 async function readResponse<T>(response: Response, path: string): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    throw new ApiResponseError(response.status, formatApiError(response, path, error));
+    const payload = isApiErrorPayload(error) ? error : undefined;
+    throw new ApiResponseError(response.status, formatApiError(response, path, payload), payload);
   }
 
   if (response.status === 204) {
@@ -210,8 +211,7 @@ function operationKey(...parts: string[]) {
   return [...parts, random].join(":");
 }
 
-function formatApiError(response: Response, path: string, error: unknown) {
-  const payload = isApiErrorPayload(error) ? error : null;
+function formatApiError(response: Response, path: string, payload?: ApiErrorPayload) {
   const message = payload?.message || fallbackMessage(response.status);
   const code = payload?.code ? ` Código: ${payload.code}.` : "";
   const correlationId = payload?.correlationId ? ` CorrelationId: ${payload.correlationId}.` : "";
@@ -227,10 +227,13 @@ function fallbackMessage(status: number) {
   return "No fue posible completar la operación.";
 }
 
-function isApiErrorPayload(value: unknown): value is {
+type ApiErrorPayload = {
   code?: string;
   message?: string;
   correlationId?: string;
-} {
+  details?: Record<string, unknown>;
+};
+
+function isApiErrorPayload(value: unknown): value is ApiErrorPayload {
   return typeof value === "object" && value !== null;
 }

@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import java.util.List;
@@ -76,7 +77,9 @@ public class VisitPackageController {
 	public record VisitPackagePurchaseRequest(
 			@NotNull UUID clientId,
 			@NotNull UUID packagePlanId,
-			@NotBlank @Size(max = 32) String method,
+			@NotBlank @Size(max = 32)
+			@Pattern(regexp = "(?i)\\s*(CASH|TRANSFER|CARD_MANUAL|CARD_MERCADO_PAGO)\\s*",
+					message = "Selecciona un método de pago de recepción válido") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,
 			@Size(max = 1000) String notes,

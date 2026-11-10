@@ -82,3 +82,16 @@ function manager(permissions: string[]): CurrentUser {
     surfaceColor: "#FFFFFF",
   };
 }
+
+test("reception contracting requires both client search and an actionable operation", () => {
+  const path = "/reception/memberships";
+  const allowed = (permissions: string[]) => canAccessRoute({ ...manager(permissions), console: "RECEPTION" }, path);
+  for (const authority of ["client.read", "client.create", "client.update", "membership.read", "membership.create", "membership.update"]) {
+    assert.equal(allowed([authority, "sale.create"]), true);
+    assert.equal(allowed([authority]), false);
+  }
+  assert.equal(allowed(["membership.read", "membership.renew"]), true);
+  assert.equal(allowed(["membership.read", "membership.change-plan"]), true);
+  assert.equal(allowed(["sale.create"]), false);
+  assert.equal(allowed(["client.read", "membership.renew"]), false);
+});

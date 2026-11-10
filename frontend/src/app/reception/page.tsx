@@ -14,8 +14,7 @@ import {
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
-import { ReceptionRenewalWidget } from "./ReceptionRenewalWidget";
-import { canLaunchKiosk, canRegisterCheckIn } from "@/lib/role-model";
+import { canAccessRoute, canLaunchKiosk, canRegisterCheckIn } from "@/lib/role-model";
 
 export default function ReceptionPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -78,7 +77,11 @@ export default function ReceptionPage() {
   const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
   const receptionOrganizationName =
     organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymFort";
-  const focusActions = session ? getVisibleFocusActions(canLaunchKiosk(session.user), canRegisterCheckIn(session.user)) : [];
+  const focusActions = session ? getVisibleFocusActions(
+    canLaunchKiosk(session.user),
+    canRegisterCheckIn(session.user),
+    canAccessRoute(session.user, "/reception/memberships"),
+  ) : [];
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -138,8 +141,6 @@ export default function ReceptionPage() {
         />
       ) : (
         <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
-          <ReceptionRenewalWidget session={session} />
-
           {/* Main Hub Grid */}
           <section>
             <h3 className="text-lg font-black text-[color:var(--brand-primary)] mb-5 px-1 uppercase tracking-widest opacity-60">Módulos Operativos</h3>
@@ -152,7 +153,7 @@ export default function ReceptionPage() {
                     href={action.href}
                     className={`group relative flex flex-col p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
                       isPrimary 
-                        ? "col-span-1 md:col-span-2 lg:col-span-2 shadow-lg" 
+                        ? "col-span-1 lg:col-span-2 xl:col-span-1 shadow-lg"
                         : "shadow-sm bg-white"
                     }`}
                     style={isPrimary ? {

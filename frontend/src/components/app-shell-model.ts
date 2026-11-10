@@ -1,5 +1,5 @@
 import type { StoredSession } from "../lib/api/types.ts";
-import { isPlatformAdmin, isSupportMode, type UserConsole } from "../lib/role-model.ts";
+import { canManageReceptionMemberships, isPlatformAdmin, isSupportMode, type UserConsole } from "../lib/role-model.ts";
 
 export type ShellBrand = {
   logoUrl?: string | null;
@@ -129,6 +129,7 @@ const receptionSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Inicio recepción", href: "/reception", hint: "Acciones del día", permissions: ["client.read", "sale.create"] },
+      { label: "Membresías y paquetes", href: "/reception/memberships", hint: "Contrataciones y renovaciones" },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Registro de entradas", href: "/reception/check-in", hint: "Acceso presencial e historial", permissions: ["access.check-in"] },
       { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
@@ -201,6 +202,7 @@ export function visibleSectionsForConsole({
 }
 
 export function canSeeLink(permissions: Set<string>, link: NavigationLink) {
+  if (link.href === "/reception/memberships") return canManageReceptionMemberships(permissions);
   if (!link.permissions || link.permissions.length === 0) {
     return true;
   }
@@ -212,7 +214,7 @@ export function canUseWithoutBranch(hasBranch: boolean, link: NavigationLink) {
 }
 
 export function isActive(pathname: string, href: string) {
-  if (href === "/platform") {
+  if (href === "/platform" || href === "/reception") {
     return pathname === href;
   }
   return pathname === href || pathname.startsWith(`${href}/`);

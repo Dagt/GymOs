@@ -655,13 +655,246 @@ test.describe("consolas por rol", () => {
     await expect(page.getByRole("heading", { name: /Recepcion|Revolucion/i })).toBeVisible();
     await expect(page.locator("strong").filter({ hasText: /^Recepcion$/ }).first()).toBeVisible();
     await expect(page.getByText(/Cobrar venta o membres/i)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Buscar socio" })).toHaveCount(0);
+    await expect(page.locator('a[href="/reception/memberships"]')).toHaveCount(2);
     await expect(page.locator('a[href="/reception/renewals"]')).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Equipo/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Configuración/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Pantalla para socios", exact: true })).toBeVisible();
     await page.goto("/clients");
     await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
+  });
+
+  test("recepción contrata membresías y paquetes desde un solo lugar", async ({ page }, testInfo) => {
+    const memberId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const membershipId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const base = { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Plan Base", status: "ACTIVE", durationDays: 30, priceCents: 50000 };
+    const plus = { ...base, id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", name: "Plan Plus", durationDays: 60 };
+    const packagePlan = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", name: "Paquete Flex", status: "ACTIVE", priceCents: 35000, currency: "MXN" };
+    const operations: string[] = [];
+    const purchases: Array<Record<string, unknown>> = [];
+    let membership: { planId: string; planName: string; endsOn: string } | null = null;
+    let packageActive = false;
+    const screenshotOptions = { animations: "disabled", style: "nextjs-portal { display: none }" } as const;
+    const releasePurchase = Promise.withResolvers<void>();
+
+    await bootAs(page, user({
+      console: "RECEPTION",
+      roles: ["Recepcion"],
+      permissions: [...receptionPermissions(), "access.check-in"],
+      organizationName: "Gym Demo",
+      brandName: "Gym Demo",
+      fullName: "Recepción Demo",
+      username: "recepcion@example.invalid",
+    }),
+      async (route, path) => {
+        const url = new URL(route.request().url());
+        const send = async (json: unknown, status = 200) => {
+          await route.fulfill({ json, status });
+          return true;
+        };
+        if (path === "/organizations/current") return send({ tradeName: "Gym Demo" });
+        if (path === "/organizations/current/branches") return send([{ ...branches[0], name: "Sucursal Demo" }]);
+        if (path === "/clients") {
+          expect(url.searchParams.get("query")).toBe("socio@example.invalid");
+          return send([{ id: memberId, firstName: "Socio", lastName: "Demo", status: "ACTIVE", email: "socio@example.invalid" }]);
+        }
+        if (path === "/catalog/plans") return send([base, plus]);
+        if (path === `/clients/${memberId}/memberships`) {
+          return send(membership ? [{ ...membership, id: membershipId, status: "ACTIVE", startsOn: "2026-11-10" }] : []);
+        }
+        if (path === "/membership-quotes") {
+          const plan = route.request().postDataJSON().planId === base.id ? base : plus;
+          return send({ planId: plan.id, planName: plan.name, planPriceCents: plan.priceCents,
+            totalCents: plan.priceCents, registrationFeeCents: 0, discountCents: 0, currency: "MXN", appliedBenefits: [] });
+        }
+        if (["/membership-enrollments", `/memberships/${membershipId}/renew`, `/memberships/${membershipId}/change-plan`].includes(path)) {
+          operations.push(path);
+          const payload = route.request().postDataJSON();
+          expect(payload.idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
+          const plan = payload.targetPlanId === plus.id ? plus : base;
+          membership = { planId: plan.id, planName: plan.name, endsOn: path.endsWith("/renew") ? "2027-01-08" : "2026-12-09" };
+          return send({ saleStatus: "PAID", saleNumber: `QA-${operations.length}` });
+        }
+        if (path === "/catalog/visit-package-plans") return send([packagePlan]);
+        if (path === `/clients/${memberId}/visit-package`) {
+          return send(packageActive ? { packageName: packagePlan.name, status: "ACTIVE",
+            totalVisits: 5, remainingVisits: 5, validUntil: "2026-11-30" } : null);
+        }
+        if (path === "/visit-packages/quotes") {
+          return send({ packagePlanId: packagePlan.id, totalVisits: 5, validityDays: 21, packagePriceCents: 35000,
+            registrationFeeCents: 5000, registrationFeeLabel: "Inscripción", totalCents: 40000, currency: "MXN" });
+        }
+        if (path === "/visit-packages/purchases") {
+          purchases.push(route.request().postDataJSON());
+          if (purchases.length === 1) {
+            return send({ code: "VALIDATION_ERROR", message: "Datos inválidos.",
+              details: { reference: "comprueba la referencia" }, correlationId: "qa-correlation" }, 400);
+          }
+          await releasePurchase.promise;
+          packageActive = true;
+          return send({ entitlementStatus: "ACTIVE", saleNumber: "QA-PACK" });
+        }
+        return false;
+      });
+
+    await page.goto("/reception");
+    await expect(page.getByRole("link", { name: /Registrar entrada/ })).toBeVisible();
+    for (const label of ["Abrir caja", "Ver reporte", "Abrir kiosco seguro", "Ver agenda"]) {
+      await expect(page.getByRole("link", { name: new RegExp(label) })).toBeVisible();
+    }
+    await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath("dashboard-recepcion.png") });
+    await page.getByRole("link", { name: /Contrataciones Membresías y paquetes/ }).click();
+    await expect(page.getByRole("heading", { name: "Membresías y paquetes" })).toBeVisible();
+    await page.getByLabel("Nombre, teléfono o correo electrónico").fill("socio@example.invalid");
+    await page.getByRole("button", { name: "Buscar socio" }).click();
+    await page.getByRole("button", { name: /Socio Demo/ }).click();
+    await expect(page.getByText("Estado: Activo")).toBeVisible();
+    await expect(page.getByText("El socio no tiene membresía.")).toBeVisible();
+
+    const confirm = page.getByRole("button", { name: "Confirmar operación" });
+    await page.getByRole("button", { name: "Asignar membresía" }).click();
+    await page.getByRole("combobox", { name: "Plan", exact: true }).selectOption(base.id);
+    await expect(page.getByText("Vigencia del plan: 30 días")).toBeVisible();
+    await confirm.click();
+    await expect(page.getByText("Plan Base · Activa")).toBeVisible();
+
+    await page.getByRole("button", { name: "Renovar membresía" }).click();
+    await confirm.click();
+    await expect(page.getByText("Vigencia: 2026-11-10 a 2027-01-08")).toBeVisible();
+
+    await page.getByRole("button", { name: "Cambiar plan" }).click();
+    await page.getByRole("combobox", { name: "Plan", exact: true }).selectOption(plus.id);
+    await confirm.click();
+    await expect(page.getByText("Plan Plus · Activa")).toBeVisible();
+    expect(operations).toEqual(["/membership-enrollments", `/memberships/${membershipId}/renew`, `/memberships/${membershipId}/change-plan`]);
+    await page.getByRole("button", { name: "Cerrar mensaje" }).click();
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("membresias-y-paquetes.png") });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Vender paquete de visitas" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("5 visitas · 21 días")).toBeVisible();
+    await expect(dialog.getByText("$400.00", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("Referencia (opcional)")).toHaveCount(0);
+    await dialog.getByLabel("Método de pago").selectOption("TRANSFER");
+    await dialog.getByLabel("Referencia (opcional)").fill("QA-123");
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("cotizacion-paquete-movil.png") });
+    const submit = dialog.getByRole("button", { name: "Cobrar y crear saldo" });
+    await submit.click();
+    await expect(page.getByRole("alert").filter({ hasText: "Referencia: comprueba la referencia." })).toContainText("qa-correlation");
+    await submit.click();
+    try {
+      await expect(dialog.getByRole("button", { name: "Procesando..." })).toBeDisabled();
+      await expect(dialog.getByLabel("Método de pago")).toBeDisabled();
+      await dialog.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    } finally {
+      releasePurchase.resolve();
+    }
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText(/Paquete activado. Venta QA-PACK/)).toBeVisible();
+    await expect(page.getByText("de 5 visitas", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toHaveCount(0);
+    expect(purchases).toHaveLength(2);
+    expect(purchases[0]).toMatchObject({ clientId: memberId, packagePlanId: packagePlan.id, method: "TRANSFER", reference: "QA-123" });
+    expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
+    expect(purchases[1].idempotencyKey).not.toBe(purchases[0].idempotencyKey);
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/reception");
+    await page.getByRole("navigation", { name: "Menú principal" }).getByRole("link", { name: /Membresías y paquetes/ }).click();
+    await expect(page).toHaveURL(/\/reception\/memberships$/);
+  });
+
+
+  for (const operation of ["Asignar membresía", "Renovar membresía", "Cambiar plan", "Vender paquete de visitas"]) {
+    test(`recupera Point sin crear otra venta: ${operation}`, async ({ page }) => {
+      const clientId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const paymentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+      const membershipId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+      const packageSale = operation === "Vender paquete de visitas";
+      const plan = { id: "base", name: "Plan Base", status: "ACTIVE", durationDays: 30, priceCents: 50000, currency: "MXN" };
+      const next = { ...plan, id: "plus", name: "Plan Plus" };
+      const endpoint = operation === "Asignar membresía" ? "/membership-enrollments"
+        : operation === "Renovar membresía" ? `/memberships/${membershipId}/renew`
+        : operation === "Cambiar plan" ? `/memberships/${membershipId}/change-plan`
+        : "/visit-packages/purchases";
+      let writes = 0;
+      let dispatches = 0;
+      await bootAs(page, user({
+        console: "RECEPTION", roles: ["Recepcion"],
+        permissions: [...receptionPermissions(), "payment.settings.read", "sale.read"],
+      }), async (route, path) => {
+        const send = async (json: unknown, status = 200) => { await route.fulfill({ json, status }); return true; };
+        if (path === "/clients") return send([{ id: clientId, firstName: "Socio", lastName: "Demo", status: "ACTIVE" }]);
+        if (path === `/clients/${clientId}/memberships`) return send(operation === "Asignar membresía" ? [] :
+          [{ id: membershipId, planId: plan.id, planName: plan.name, status: "ACTIVE", startsOn: "2026-11-10", endsOn: "2026-12-09" }]);
+        if (path === `/clients/${clientId}/visit-package`) return send(packageSale && writes
+          ? { status: "PENDING_PAYMENT", packageName: plan.name } : null);
+        if (path === "/payment-settings") return send({ mercadoPagoReady: true });
+        if (path === "/catalog/plans") return send([plan, next]);
+        if (path === "/catalog/visit-package-plans") return send([plan]);
+        if (path === "/membership-quotes") {
+          return send({ planId: route.request().postDataJSON().planId, planPriceCents: 50000,
+            totalCents: 50000, discountCents: 0, registrationFeeCents: 0, currency: "MXN", appliedBenefits: [] });
+        }
+        if (path === "/visit-packages/quotes") return send({ packagePlanId: plan.id, totalVisits: 5,
+          validityDays: 21, packagePriceCents: 50000, totalCents: 50000, registrationFeeCents: 0, currency: "MXN" });
+        if (path === endpoint) {
+          writes++;
+          expect(route.request().postDataJSON()).toMatchObject({ method: "CARD_MERCADO_PAGO", validateNow: false });
+          return send({ saleId: "qa-sale", saleStatus: "PENDING_PAYMENT", entitlementStatus: "PENDING_PAYMENT", saleNumber: "QA-POINT", paymentId });
+        }
+        if (path.startsWith("/sales/payments/")) {
+          expect(path).toBe(`/sales/payments/${paymentId}/mercado-pago-order`);
+          dispatches++;
+          if (dispatches === 1) return send({ code: "POINT_UNAVAILABLE", message: "Terminal no disponible" }, 400);
+          if (dispatches === 2) return send({ status: "AWAITING_PAYMENT" });
+          return send({ code: "PAYMENT_ALREADY_COMPLETED", message: "El pago ya fue confirmado." }, 400);
+        }
+        return false;
+      });
+
+      async function selectMember() {
+        await page.getByLabel("Nombre, teléfono o correo electrónico").fill("Socio");
+        await page.getByRole("button", { name: "Buscar socio" }).click();
+        await page.getByRole("button", { name: "Socio Demo" }).click();
+      }
+
+      await page.goto("/reception/memberships");
+      await selectMember();
+      await page.getByRole("button", { name: operation, exact: true }).click();
+      if (operation === "Asignar membresía" || operation === "Cambiar plan") {
+        await page.getByRole("combobox", { name: "Plan", exact: true }).selectOption(operation === "Cambiar plan" ? next.id : plan.id);
+      }
+      await page.getByRole("combobox", { name: "Método de pago" }).selectOption("CARD_MERCADO_PAGO");
+      await page.getByRole("button", { name: packageSale ? "Cobrar y crear saldo" : "Confirmar operación" }).click();
+      await expect(page.getByText(/La venta QA-POINT ya está registrada/)).toBeVisible();
+      await expect(page.getByText(/Operación confirmada|Paquete activado/)).toHaveCount(0);
+
+      await page.reload();
+      await selectMember();
+      const recover = page.getByRole("button", { name: "Recuperar envío a Point" });
+      await recover.click();
+      await expect(page.getByText(/Espera la confirmación del pago en Point/)).toBeVisible();
+      await expect(page.getByRole("link", { name: "Consultar venta" })).toHaveAttribute("href", "/sales/qa-sale");
+      await recover.click();
+      await expect(page.getByText(/El servidor confirmó el pago de la venta QA-POINT/)).toBeVisible();
+      await expect(recover).toHaveCount(0);
+      expect(writes).toBe(1);
+      expect(dispatches).toBe(3);
+    });
+  }
+
+  test("recepción sin permisos comerciales no ve ni abre contrataciones", async ({ page }) => {
+    await bootAs(page, user({ console: "RECEPTION", roles: ["Recepcion"], permissions: ["client.read", "access.check-in"] }));
+    await page.goto("/reception");
+    await expect(page.getByRole("heading", { name: /Dashboard de recepcion/ })).toBeVisible();
+    await expect(page.locator('a[href="/reception/memberships"]')).toHaveCount(0);
+    await page.goto("/reception/memberships");
+    await expect(page).toHaveURL(/\/reception$/);
   });
 
   test("Admin GymFort en soporte ve banda y regreso a administracion", async ({ page }) => {

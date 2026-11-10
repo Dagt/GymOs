@@ -96,6 +96,9 @@ export function isSupportMode(user: CurrentUser) {
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
   const console = resolveUserConsole(user);
+  if (matches(pathname, "/reception/memberships") || matches(pathname, "/reception/renewals")) {
+    return console === "RECEPTION" && canManageReceptionMemberships(new Set(user.permissions));
+  }
   if (matches(pathname, "/reception/check-in")) {
     return canRegisterCheckIn(user);
   }
@@ -133,6 +136,15 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return receptionRoutes.some((route) => matches(pathname, route));
   }
   return coachRoutes.some((route) => matches(pathname, route));
+}
+
+export function canManageReceptionMemberships(permissions: ReadonlySet<string>) {
+  // GET /clients grants search through any of these authorities.
+  const canSearchClients = ["client.read", "client.create", "client.update", "membership.read", "membership.create", "membership.update"]
+    .some((permission) => permissions.has(permission));
+  const canMaintainMembership = permissions.has("membership.read")
+    && (permissions.has("membership.renew") || permissions.has("membership.change-plan"));
+  return canSearchClients && (permissions.has("sale.create") || canMaintainMembership);
 }
 
 export function canRegisterCheckIn(user: CurrentUser) {

@@ -19,6 +19,8 @@ nombre técnico interno durante la transición de marca.
 - PAY-001 y SELF-001 (#34) permiten retomar el pago original del kiosco tras volver a verificar al socio. El retorno de Stripe se vincula a la sesión, el pago o el mandato exactos. El cierre del kiosco rota la credencial y limpia los datos del socio.
 - Checkout y la captura de tarjeta distinguen la expiración y los estados pendientes que Stripe informa. Los reintentos conservan la idempotencia. La aceptación conectada en Stripe test y staging permanece pendiente.
 
+- Recepción concentra las contrataciones en «Membresías y paquetes». La ficha y recepción comparten el formulario de paquetes y envían claves de idempotencia dentro del límite del API.
+
 - SAL-001 (#33) serializa ventas, pagos, devoluciones y cancelaciones, protege las reservas de Point y permite recuperar operaciones con resultado incierto desde recepción.
 
 - Point requiere moneda explícita de la orden e importe efectivamente pagado. Las respuestas insuficientes quedan pendientes de conciliación.

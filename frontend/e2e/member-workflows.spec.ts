@@ -198,7 +198,7 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
   });
 });
 
-test("la renovación vive en el inicio y la ruta anterior redirige", async ({ page }) => {
+test("el marcador de renovaciones abre contrataciones y conserva los descuentos del socio", async ({ page }) => {
   let changePlanPayload: Record<string, unknown> | null = null;
   await bootMemberWorkflow(page, async (route, path) => {
     const method = route.request().method();
@@ -263,27 +263,56 @@ test("la renovación vive en el inicio y la ruta anterior redirige", async ({ pa
     return false;
   });
 
-  await page.goto("/reception");
-  await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toBeVisible();
-  await expect(page.locator('a[href="/reception/renewals"]')).toHaveCount(0);
-  await expect(page.getByText("🔄")).toHaveCount(0);
+  await page.goto("/reception/renewals");
+  await expect(page).toHaveURL(/\/reception\/memberships$/);
+  await expect(page.getByRole("heading", { name: "Membresías y paquetes" })).toBeVisible();
 
-  await page.getByPlaceholder("Nombre, teléfono o email").fill("Andrea");
+  await page.getByLabel("Nombre, teléfono o correo electrónico").fill("Andrea");
   await page.getByRole("button", { name: "Buscar socio" }).click();
   await page.getByRole("button", { name: /Andrea López/ }).click();
-  await page.getByLabel("Operación").selectOption(targetPlanId);
-  await expect(page.getByText(/Beneficios: Descuento estudiante/)).toBeVisible();
   await page.getByRole("button", { name: "Cambiar plan" }).click();
-  await expect(page.getByText(/Plan cambiado por/)).toBeVisible();
+  await page.getByRole("combobox", { name: "Plan", exact: true }).selectOption(targetPlanId);
+  await expect(page.getByText(/Beneficios: Descuento estudiante/)).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar operación" }).click();
+  await expect(page.getByText("Operación confirmada. Venta V-RECEPTION-001.")).toBeVisible();
   expect(changePlanPayload).toMatchObject({
     targetPlanId,
     method: "CASH",
     validateNow: true,
   });
+});
 
-  await page.goto("/reception/renewals");
-  await expect(page).toHaveURL(/\/reception$/);
-  await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toBeVisible();
+test("la ficha vende el paquete con una clave válida y actualiza su historial", async ({ page }) => {
+  const purchases: Array<Record<string, unknown>> = [];
+  const entitlement = activeSaunaPackage();
+  const packagePlanId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  await bootMemberWorkflow(page, async (route, path) => {
+    if (path === `/clients/${clientId}`) {
+      return fulfill(route, { client: { ...clientSummary("Socio", "Plan Base", "ACTIVE"), id: clientId }, timeline: [] });
+    }
+    if (path === `/clients/${clientId}/visit-package`) return fulfill(route, purchases.length ? entitlement : null);
+    if (path === `/clients/${clientId}/visit-packages`) return fulfill(route, purchases.length ? [entitlement] : []);
+    if (path === "/catalog/visit-package-plans") {
+      return fulfill(route, [{ id: packagePlanId, name: entitlement.packageName, priceCents: 35000, currency: "MXN", status: "ACTIVE" }]);
+    }
+    if (path === "/visit-packages/quotes") {
+      return fulfill(route, { packagePlanId, totalVisits: 5, validityDays: 21, packagePriceCents: 35000,
+        registrationFeeCents: 0, totalCents: 35000, currency: "MXN" });
+    }
+    if (path === "/visit-packages/purchases") {
+      purchases.push(route.request().postDataJSON());
+      return fulfill(route, { entitlementStatus: "ACTIVE", saleNumber: "QA-FICHA" });
+    }
+    return false;
+  });
+  await page.goto(`/clients/${clientId}`);
+  await page.getByRole("button", { name: "Vender paquete", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Cobrar y crear saldo" }).click();
+  await expect(page.getByText("Paquete activado. Venta QA-FICHA.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Historial de paquetes" })).toBeVisible();
+  expect(purchases).toHaveLength(1);
+  expect(purchases[0]).toMatchObject({ clientId, packagePlanId, method: "CASH", reference: null });
+  expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
 });
 
 async function bootMemberWorkflow(
