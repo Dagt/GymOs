@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "./memberships.module.css";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
@@ -123,8 +124,9 @@ function MemberSearch({ session }: { session: StoredSession }) {
   }
 
   return (
-    <div className="grid w-full min-w-0 gap-4">
-      <section className="app-card grid gap-3 p-4">
+    <div className={styles.workspace}>
+      <section className="app-card reception-toolbar">
+        <div className="reception-step"><span>1</span><h2>Selecciona al socio</h2></div>
         <form aria-label="Búsqueda de socios" className="relative flex gap-2" onSubmit={submitSearch}>
           <div className="relative min-w-0 flex-1">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-[var(--brand-muted)]" />
@@ -178,6 +180,7 @@ function MemberSearch({ session }: { session: StoredSession }) {
         {loading ? <p className="text-sm" role="status">Buscando socios…</p> : null}
         {error ? <AppNotice message={error} tone="error" /> : null}
         {clients?.length === 0 ? <p role="status" className="text-sm text-[var(--brand-muted)]">No se encontraron socios.</p> : null}
+        <div className="reception-step"><span>2</span><h2>Elige una operación</h2></div>
         <div aria-label="Operaciones disponibles" role="group" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {(Object.keys(operations) as ReceptionOperation[]).map((action) => (
             <ReceptionOperationCard

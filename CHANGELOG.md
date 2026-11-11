@@ -12,6 +12,8 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- Recepción centra sus acciones de membresías y paquetes, compacta el socio y saldo, y destaca el total y la confirmación en un resumen de cobro adaptable a escritorio, tablet y móvil.
+
 - «Membresías y paquetes» permite elegir primero la operación o el socio, buscar con debounce y consultar las contrataciones recientes de la sucursal mediante el listado de ventas existente.
 
 - La recuperación de Checkout verifica el estado actual en Stripe antes de

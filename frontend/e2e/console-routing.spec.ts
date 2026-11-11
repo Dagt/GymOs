@@ -820,7 +820,7 @@ test.describe("consolas por rol", () => {
     await expect(dialog.getByLabel("Referencia (opcional)")).toHaveCount(0);
     await dialog.getByLabel("Método de pago").selectOption("TRANSFER");
     await dialog.getByLabel("Referencia (opcional)").fill("QA-123");
-    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("cotizacion-paquete-movil.png") });
+    await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath("cotizacion-paquete-movil.png") });
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("formulario-paquete.png") });
@@ -845,6 +845,16 @@ test.describe("consolas por rol", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     if (await page.getByRole("button", { name: "Cerrar mensaje" }).isVisible()) await page.getByRole("button", { name: "Cerrar mensaje" }).click();
     await page.getByRole("region", { name: "Operaciones recientes" }).screenshot({ ...screenshotOptions, path: testInfo.outputPath("operaciones-recientes.png") });
+    // Reproduce the reported layout with a current membership and an active visit balance.
+    await page.getByRole("button", { name: "Renovar membresía", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Confirmar operación" })).toBeEnabled();
+    for (const [width, height] of [[1440, 1200], [768, 1024], [390, 844]]) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath(`renovacion-con-paquete-${width}.png`) });
+    }
+
     expect(purchases).toHaveLength(2);
     expect(purchases[0]).toMatchObject({ clientId: memberId, packagePlanId: packagePlan.id, method: "TRANSFER", reference: "QA-123" });
     expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);

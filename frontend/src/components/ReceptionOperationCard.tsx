@@ -23,7 +23,7 @@ export function ReceptionOperationCard({ operation, selected, disabled, onSelect
   return (
     <button
       aria-pressed={selected}
-      className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`reception-operation flex min-h-14 items-center justify-center gap-3 rounded-lg border px-3 py-3 text-center text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${
         selected ? "border-[var(--brand-primary)] bg-[var(--brand-surface)] text-[var(--brand-primary)]"
           : "border-[var(--brand-line)] text-[var(--brand-ink)] hover:bg-[var(--brand-surface)]"
       }`}
@@ -32,7 +32,7 @@ export function ReceptionOperationCard({ operation, selected, disabled, onSelect
       type="button"
     >
       <Icon aria-hidden="true" className="size-5 shrink-0" />
-      {title}
+      <span>{title}</span>
     </button>
   );
 }

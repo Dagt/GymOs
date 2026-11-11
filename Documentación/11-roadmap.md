@@ -184,3 +184,7 @@ SHA final y un recorrido de aceptación por Recepción. [Issue #61](https://gith
 El piloto con cobros depende de la verificación de SAL-001 (#33), Stripe test (#34) y los recorridos operativos de paquetes (#35).
 
 La habilitación piloto de Point requiere verificar moneda e importe pagado en la consulta autoritativa de una orden acreditada.
+
+## Recepción: composición de membresías — 10/11/2026
+
+Pulido incremental de acciones, resumen y formulario bajo UX #26, con [capturas y pruebas locales](../docs/testing/reception-memberships-polish.md). La aceptación visual del usuario y los gates conectados siguen pendientes.

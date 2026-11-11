@@ -136,3 +136,7 @@ de la sucursal. Se respeta la gracia vigente y se registra el ID de la membresí
 que concede ese derecho. La membresía tiene prioridad sobre el paquete para el
 mismo beneficio. La reversión de una entrada por membresía conserva la vigencia
 y registra la corrección operativa. Ver [Access](10-access.md).
+
+## Pulido de recepción — 10/11/2026
+
+La pantalla usa acciones centradas, resumen compacto y cobro con total destacado en un panel lateral adaptable. Cotizaciones, permisos y recuperación de Point conservan sus contratos. [Evidencia y límites](../../docs/testing/reception-memberships-polish.md).
