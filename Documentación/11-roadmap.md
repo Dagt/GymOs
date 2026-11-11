@@ -194,3 +194,5 @@ Pulido incremental de acciones, resumen y formulario bajo UX #26, con [capturas 
 Correcciones acotadas de inventario, selector de transferencias, filtros del catálogo y membresías. POS, socios y reservas sirven como referencia; la normalización global queda fuera de esta entrega. [Evidencia](../docs/testing/ux-commercial-consistency.md).
 
 PR #74 incorpora verificación de alturas iguales y límite de cien resultados, conservando el patrón de acento inferior solicitado.
+
+PR #74 incluye la corrección del tema del tenant durante restauración de sesión y cambios de perfil/contexto, sin rediseño visual ni caché de credenciales.

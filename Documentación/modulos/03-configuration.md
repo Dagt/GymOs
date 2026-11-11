@@ -48,3 +48,5 @@ la disponibilidad técnica del proveedor y EFFECTIVE exige ambas condiciones al
 ejecutar. Un ajuste configurado no se pierde mientras Stripe está pendiente.
 El indicador de dependencia sólo se muestra para capacidades configuradas en
 `true`; una capacidad apagada se describe como deshabilitada.
+
+PR #74: paleta y logo confirmados actualizan la sesión y el tema sin navegar; el proveedor escucha los eventos de sesión y descarta respuestas de un contexto anterior. Evidencia en docs/testing/tenant-theme-session-sync.md.

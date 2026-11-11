@@ -12,6 +12,8 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- El tema visual del tenant se sincroniza al restaurar, renovar o modificar la sesión, al guardar la paleta y al salir del contexto. Se descartan perfiles tardíos de otra sesión sin esperar a navegar.
+
 - Catálogo iguala las alturas de resumen y filtros. Transferencias limita resultados con scroll visible. Los botones primarios de las secciones intervenidas recuperan su acento inferior de marca.
 
 - Inventario simplifica acciones del producto; transferencias amplía su selector y navegación por teclado. Catálogo alinea sus filtros. Membresías elimina actividad reciente y usa selección con acento de marca y confirmación visible.

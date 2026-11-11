@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { sameUserContext } from "@/lib/api/session";
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AppNotice } from "@/components/AppNotice";
@@ -11,6 +12,7 @@ import {
   createBranch,
   getBranches,
   getCurrentOrganization,
+  getCurrentUser,
   getMercadoPagoTerminals,
   getPaymentConfiguration,
   getStoredSession,
@@ -21,6 +23,7 @@ import {
   updateOrganization,
   updatePaymentConfiguration,
   type BranchSummary,
+  type CurrentUser,
   type BranchUpdatePayload,
   type CreateBranchPayload,
   type MercadoPagoTerminal,
@@ -206,7 +209,28 @@ export default function OrganizationSettingsPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await updateOrganization(session.accessToken, normalizeOrganizationForm(organizationForm));
+      const expected = getStoredSession();
+      if (!expected) return;
+      const response = await updateOrganization(expected.accessToken, normalizeOrganizationForm(organizationForm));
+      let target = expected;
+      let confirmedUser: CurrentUser = {
+        ...expected.user,
+        organizationName: response.tradeName,
+        brandName: response.brandName,
+        logoUrl: response.logoUrl,
+        primaryColor: response.primaryColor,
+        accentColor: response.accentColor,
+        surfaceColor: response.surfaceColor,
+      };
+      const active = getStoredSession();
+      if (active !== expected) {
+        if (!active || !sameUserContext(expected.user, active.user)) return;
+        // The request may have renewed the token. Read the authoritative profile instead of applying an old response.
+        target = active;
+        confirmedUser = { ...confirmedUser, ...await getCurrentUser(active.accessToken) };
+      }
+      if (!storeCurrentUser(confirmedUser, target)) return;
+      setSession(getStoredSession());
       setOrganization(response);
       setOrganizationForm(toOrganizationForm(response));
       setShowOrganizationDrawer(false);
@@ -285,8 +309,9 @@ export default function OrganizationSettingsPage() {
   }
 
   function applyUploadedLogo(logoUrl: string) {
+    const currentSession = getStoredSession();
+    if (!session || !currentSession || !sameUserContext(session.user, currentSession.user)) return;
     setOrganization((current) => current ? { ...current, logoUrl } : current);
-    const currentSession = getStoredSession() ?? session;
     if (currentSession) {
       const nextSession = {
         ...currentSession,
@@ -295,7 +320,7 @@ export default function OrganizationSettingsPage() {
           logoUrl,
         },
       };
-      storeCurrentUser(nextSession.user);
+      storeCurrentUser(nextSession.user, currentSession);
       setSession(nextSession);
     }
     setMessage("Logo del gimnasio actualizado.");
