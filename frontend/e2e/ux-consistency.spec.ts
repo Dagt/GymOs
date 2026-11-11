@@ -81,14 +81,65 @@ test("catálogo mantiene filtros, limpieza y distribución responsiva", async ({
   await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("name,desc");
   await filters.getByLabel("Archivados", { exact: true }).click();
   await expect(page).toHaveURL(/includeArchived=true/);
-  for (const width of [1440, 768, 390]) {
+  for (const width of [1440, 1366, 768, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(await filters.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-    await filters.screenshot({ path: info.outputPath(`catalogo-avanzado-${width}.png`) });
+    if (width >= 1280) {
+      const summary = page.getByRole("region", { name: "Resumen del catálogo" });
+      const left = await summary.boundingBox(), right = await filters.boundingBox();
+      expect(Math.abs(left!.height - right!.height)).toBeLessThanOrEqual(1);
+      expect(Math.abs(left!.y - right!.y)).toBeLessThanOrEqual(1);
+    }
+    await filters.locator("..").screenshot({ path: info.outputPath(`catalogo-avanzado-${width}.png`) });
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await filters.locator("summary").click();
-  await filters.screenshot({ path: info.outputPath("catalogo-principal.png") });
+  const compactSummary = await page.getByRole("region", { name: "Resumen del catálogo" }).boundingBox();
+  expect(Math.abs(compactSummary!.height - (await filters.boundingBox())!.height)).toBeLessThanOrEqual(1);
+  await filters.locator("..").screenshot({ path: info.outputPath("catalogo-principal.png") });
   await filters.getByRole("button", { name: "Limpiar", exact: true }).click();
   await expect(page).not.toHaveURL(/includeArchived|status=|inventoryTracked|type=/);
+});
+
+
+test("transferencia limita cien resultados y mantiene el acento del botón primario", async ({ page }, info) => {
+  await bootPagination(page, async (route, path) => {
+    if (path !== "/branches" && path !== "/organizations/current/branches" && path !== "/organizations/current/branches/all") return false;
+    await json(route, [{ id: branchId, name: "Centro" }, { id: "44444444-4444-4444-8444-444444444444", name: "Norte" }]);
+    return true;
+  });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto("/inventory");
+  await page.getByRole("button", { name: /Gestión de Transferencias/ }).click();
+  await page.getByRole("button", { name: "Crear Transferencia", exact: true }).click();
+  const drawer = page.getByRole("dialog");
+  await drawer.getByRole("button", { name: "Seleccionar producto" }).click();
+  const results = drawer.getByRole("list", { name: "Opciones de producto" });
+  await expect(results.getByRole("button")).toHaveCount(100);
+  for (const width of [1366, 390]) {
+    await page.setViewportSize({ width, height: 768 });
+    const dimensions = await results.evaluate(el => ({ height: el.clientHeight, scroll: el.scrollHeight, max: parseFloat(getComputedStyle(el).maxHeight) }));
+    expect(dimensions.height).toBeLessThanOrEqual(768 * .32 + 1);
+    expect(dimensions.scroll).toBeGreaterThan(dimensions.height);
+    await results.getByRole("button").last().scrollIntoViewIfNeeded();
+    expect(await results.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    await results.getByRole("button").first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath(`transferencia-100-resultados-${width}.png`) });
+  }
+  await results.getByRole("button").last().click();
+  await expect(drawer.getByRole("button", { name: "Artículo 100 · SKU-100" })).toBeVisible();
+  const submit = drawer.getByRole("button", { name: "Crear Solicitud de Transferencia" });
+  const accent = await submit.evaluate(el => ({ border: getComputedStyle(el).borderBottomColor, accent: getComputedStyle(el).getPropertyValue("--brand-accent").trim(), width: parseFloat(getComputedStyle(el).borderBottomWidth) }));
+  expect(accent.width).toBeGreaterThan(1);
+  const themeColor = await submit.evaluate(el => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--brand-accent)";
+    el.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  expect(accent.border).toBe(themeColor);
+  await submit.scrollIntoViewIfNeeded();
+  await expect(submit).toBeVisible();
 });

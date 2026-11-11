@@ -229,7 +229,7 @@ test("existencias y alertas tienen páginas y los selectores no dependen de la p
   await drawer.getByRole("button", { name: "Artículo 101 · SKU-101" }).click();
   const choices = drawer.getByRole("navigation", { name: "Paginación de opciones de producto" });
   await expect(choices).toContainText("1–100 de 127 opciones de producto");
-  await expect(drawer.getByRole("list", { name: "Opciones de producto" })).toHaveCSS("scrollbar-width", "none");
+  await expect(drawer.getByRole("list", { name: "Opciones de producto" })).toHaveCSS("scrollbar-width", "auto");
   await choices.getByRole("button", { name: "Siguiente" }).click();
   await expect(choices).toContainText("101–127 de 127 opciones de producto");
   await drawer.getByLabel("Buscar producto en todo el inventario").fill("SKU-127");

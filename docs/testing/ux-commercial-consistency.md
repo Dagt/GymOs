@@ -1,3 +1,5 @@
+> Seguimiento actual: [alturas, lista de cien productos y restauración del acento inferior](commercial-layout-followup.md). Las verificaciones originales de este informe corresponden al corte aef03176.
+
 # Correcciones UX comerciales — PR #74
 
 ## Trazabilidad

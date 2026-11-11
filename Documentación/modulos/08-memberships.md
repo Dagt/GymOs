@@ -144,3 +144,5 @@ La pantalla usa acciones centradas, resumen compacto y cobro con total destacado
 ## Recepción enfocada en contratación (PR #74)
 
 Se retira Operaciones recientes y su consulta exclusiva de ventas. Permanecen ambos órdenes de selección y los cuatro contratos. La selección usa acento de marca e icono de confirmación; avisos locales evitan tapar la confirmación al reintentar.
+
+Se restaura el acento inferior de marca y el resplandor tenue en las acciones primarias de contratación.

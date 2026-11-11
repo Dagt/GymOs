@@ -13,6 +13,8 @@
 .controls :global(.app-button) {
   background: var(--brand-action, var(--brand-primary)) !important;
   border: 1px solid var(--brand-primary) !important;
+  border-bottom: .22rem solid var(--brand-accent) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-accent) 18%, transparent) !important;
   color: white !important;
 }
 .controls :global(.app-button-secondary) {

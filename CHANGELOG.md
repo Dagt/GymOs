@@ -12,6 +12,8 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- Catálogo iguala las alturas de resumen y filtros. Transferencias limita resultados con scroll visible. Los botones primarios de las secciones intervenidas recuperan su acento inferior de marca.
+
 - Inventario simplifica acciones del producto; transferencias amplía su selector y navegación por teclado. Catálogo alinea sus filtros. Membresías elimina actividad reciente y usa selección con acento de marca y confirmación visible.
 
 - Recepción centra sus acciones de membresías y paquetes, compacta el socio y saldo, y destaca el total y la confirmación en un resumen de cobro adaptable a escritorio, tablet y móvil.

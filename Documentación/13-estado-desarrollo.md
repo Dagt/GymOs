@@ -358,3 +358,5 @@ Rama `codex/reception-memberships-visual-polish`, base main `36b50d545eb3def2871
 ## Continuación UX del PR #74
 
 Sobre codex/reception-memberships-visual-polish, SHA inicial e534bdc809487fce23ca1424168be6c1c67e03f0. Se integra inventario, transferencias, filtros y retiro de actividad reciente de membresías sin sustituir el trabajo previo. SHA final, comandos y capturas en el PR y [verificación](../docs/testing/ux-commercial-consistency.md). Sin merge.
+
+PR #74 continúa desde aef03176 en la misma rama; seguimiento de alturas, cien resultados y acento inferior en docs/testing/commercial-layout-followup.md.

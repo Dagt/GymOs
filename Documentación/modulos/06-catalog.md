@@ -85,3 +85,5 @@ Contrato integral: `../33-planes-beneficios-paquetes-visitas.md`.
 ## Alineación de filtros (PR #74)
 
 Los filtros principales y avanzados reutilizan app-input, form-field y app-button-secondary con cuadrícula responsiva y altura uniforme. Se conservan URL, búsqueda, categorías, archivados, orden y paginación.
+
+Resumen y filtros comparten la altura de su fila, con prueba geométrica en escritorio y sin alturas rígidas al expandir.

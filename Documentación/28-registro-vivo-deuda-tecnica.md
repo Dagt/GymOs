@@ -173,3 +173,5 @@ Se corrige la composición dispareja de membresías y el fondo secundario hereda
 ## Consistencia visual acotada (PR #74)
 
 Corregidos ancho del selector de transferencias y alineación de filtros del catálogo. Se mantienen cambios locales; la cascada global de globals.css con múltiples overrides y el foco de otros drawers requieren una tarea independiente, no un rediseño global en esta entrega.
+
+Seguimiento PR #74: se corrigen alturas independientes de resumen/filtros y se restaura el acento inferior retirado por normalización local. La cascada global sigue fuera de alcance.
