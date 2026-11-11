@@ -5,7 +5,7 @@ import { AppNotice } from "@/components/AppNotice";
 import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import { ReceptionPointRecovery, useReceptionPoint } from "@/components/ReceptionPointRecovery";
 import { runSaleWrite } from "@/lib/sale-write";
-import { membershipOperations, ReceptionOperationCard } from "@/components/ReceptionOperationCard";
+import { membershipOperations, type ReceptionOperation } from "@/components/ReceptionOperationCard";
 import { VisitPackageCard } from "@/components/VisitPackageCard";
 import { currentMembership } from "@/app/clients/[clientId]/client-membership-helpers";
 import { resolveClientMembershipCapabilities } from "@/app/clients/[clientId]/client-membership-permissions";
@@ -30,8 +30,10 @@ const clientStatus = { ACTIVE: "Activo", INACTIVE: "Inactivo", SUSPENDED: "Suspe
 type Operation = keyof typeof membershipOperations;
 type PaymentMethod = RenewMembershipPayload["method"];
 
-export function ReceptionMemberOperations({ client, session, onBusyChange, onClear }: {
+export function ReceptionMemberOperations({ client, session, onBusyChange, onClear, operation, onSaleRecorded }: {
   client: ClientSummary;
+  operation: ReceptionOperation | null;
+  onSaleRecorded: () => void;
   session: StoredSession;
   onBusyChange: (busy: boolean) => void;
   onClear: () => void;
@@ -46,7 +48,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [manualCardEnabled, setManualCardEnabled] = useState(false);
   const [pointEnabled, setPointEnabled] = useState(false);
-  const [operation, setOperation] = useState<Operation | null>(null);
+  const [previousOperation, setPreviousOperation] = useState(operation);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [quote, setQuote] = useState<MembershipQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -84,8 +86,10 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
     return () => { active = false; };
   }, [token, client.id, canReadPaymentSettings, capabilities.canEnroll, capabilities.canManage]);
 
+  const canExecuteMembership = operation !== null && operation !== "package" && actionAllowed(operation);
+
   useEffect(() => {
-    if (!operation || !targetPlanId) return;
+    if (!canExecuteMembership || !targetPlanId) return;
     let active = true;
     getMembershipQuote(token, client.id, targetPlanId)
       .then((result) => { if (active) setQuote(result); })
@@ -93,24 +97,26 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
         if (active) setQuoteError(contractErrorMessage(exception, "No fue posible calcular la cotización."));
       });
     return () => { active = false; };
-  }, [token, client.id, operation, targetPlanId]);
+  }, [token, client.id, operation, targetPlanId, canExecuteMembership]);
 
   useEffect(() => {
-    if (operation) operationForm.current?.focus();
-  }, [operation]);
+    if (canExecuteMembership) operationForm.current?.focus();
+  }, [operation, canExecuteMembership]);
 
-  function selectOperation(next: Operation | null) {
-    setOperation(next);
+  if (previousOperation !== operation) {
+    setPreviousOperation(operation);
     setSelectedPlanId("");
     setQuote(null);
     setQuoteError(null);
-    setError(null);
-    setMessage(null);
+    if (operation) {
+      setError(null);
+      setMessage(null);
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || point.pending || !operation || !targetPlanId || !visibleQuote || !actionAllowed(operation)) return;
+    if (inFlight.current || point.pending || !operation || operation === "package" || !targetPlanId || !visibleQuote || !actionAllowed(operation)) return;
     inFlight.current = true;
     setProcessing(true);
     onBusyChange(true);
@@ -130,7 +136,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
           : renewMembership(token, membership!.id, { ...payment, idempotencyKey });
       const result = await runSaleWrite(session, `reception-membership:${client.id}`,
         { ...payment, operation, membershipId: membership?.id, targetPlanId }, write);
-      selectOperation(null);
+      onSaleRecorded();
       setReference("");
       setMethod("CASH");
       if (method === "CARD_MERCADO_PAGO" && result.saleStatus === "PENDING_PAYMENT") {
@@ -184,8 +190,8 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
   }
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-      <section className="app-card grid gap-4 p-5">
+    <div className="grid min-w-0 gap-3">
+      <section className="app-card grid gap-3 p-4 md:grid-cols-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="app-eyebrow">Socio seleccionado</p>
@@ -207,26 +213,20 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
         {error ? <AppNotice message={error} tone="error" /> : null}
         {point.pending && capabilities.canEnroll ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
           canReadSale={session.user.permissions.includes("sale.read")}
-          onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
+          onRetry={() => { if (point.pending) void sendPoint(point.pending).finally(onSaleRecorded); }} /> : null}
       </section>
-      <section className="grid min-w-0 gap-3" aria-labelledby="selected-operations">
-        <h2 className="app-card-title" id="selected-operations">Operaciones disponibles</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(Object.keys(membershipOperations) as Operation[]).map((action) => (
-            <ReceptionOperationCard
-              key={action}
-              {...membershipOperations[action]}
-              selected={operation === action}
-              disabled={processing || !actionAllowed(action)}
-              onSelect={() => selectOperation(action)}
-            />
-          ))}
-          <VisitPackageCard clientId={client.id} clientName={clientName} session={session} source="reception" />
-        </div>
-        {operation ? (
+      <section className="grid min-w-0 gap-3">
+        <VisitPackageCard clientId={client.id} clientName={clientName} session={session}
+          source="reception" selected={operation === "package"}
+          onSaleRecorded={onSaleRecorded} onBusyChange={onBusyChange} />
+        {operation && operation !== "package" && !loading && !canExecuteMembership ? (
+          <p role="status" className="app-card p-4 text-sm">Esta operación requiere {operation === "enroll" ? "un socio sin membresía actual y permiso de venta" : operation === "change" ? "una membresía activa y permiso para cambiar el plan" : "una membresía activa o vencida y permiso de renovación"}. Revisa la membresía del socio o elige otra operación.</p>
+        ) : null}
+        {canExecuteMembership && operation ? (
           <form className="app-card p-4" onSubmit={submit} ref={operationForm} tabIndex={-1}>
             <fieldset className="grid gap-3 rounded-lg border border-[var(--brand-line)] p-4" disabled={processing}>
               <legend className="px-1 font-semibold">{membershipOperations[operation].title}</legend>
+              <p className="text-sm">Socio {clientName}</p>
               {operation !== "renew" ? (
                 <label className="form-field">
                   <span>Plan</span>

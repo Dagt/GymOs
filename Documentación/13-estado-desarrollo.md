@@ -15,6 +15,8 @@ los reembolsos de proveedor continúan pendientes.
 
 ## Contrataciones en recepción
 
+La pantalla operativa combina búsqueda rápida, selección de operación y formularios existentes. Las operaciones recientes se leen desde GET /sales para perfiles con sale.read.
+
 El dashboard destaca las contrataciones. El expediente muestra el paquete vigente o pendiente y agrupa los accesos y descuentos en dos columnas cuando hay espacio.
 
 «Membresías y paquetes» centraliza la búsqueda, asignación, renovación,

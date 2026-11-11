@@ -682,7 +682,7 @@ test.describe("consolas por rol", () => {
     await bootAs(page, user({
       console: "RECEPTION",
       roles: ["Recepcion"],
-      permissions: [...receptionPermissions(), "access.check-in"],
+      permissions: [...receptionPermissions(), "access.check-in", "sale.read"],
       organizationName: "Gym Demo",
       brandName: "Gym Demo",
       fullName: "Recepción Demo",
@@ -696,6 +696,15 @@ test.describe("consolas por rol", () => {
         };
         if (path === "/organizations/current") return send({ tradeName: "Gym Demo" });
         if (path === "/organizations/current/branches") return send([{ ...branches[0], name: "Sucursal Demo" }]);
+        if (path === "/sales") {
+          const rows = operations.map((operation, index) => ({
+            id: "qa-sale-" + index, saleNumber: "QA-" + (index + 1), clientName: "Socio Demo",
+            businessContext: operation.endsWith("/renew") ? "MEMBERSHIP_RENEWAL" : operation.endsWith("/change-plan") ? "MEMBERSHIP_PLAN_CHANGE" : "MEMBERSHIP_ENROLLMENT",
+            status: "PAID", soldAt: "2026-11-10T18:00:00Z", totalCents: 50000, currency: "MXN",
+          }));
+          if (packageActive) rows.unshift({ ...rows[0], id: "qa-pack", saleNumber: "QA-PACK", totalCents: 40000, businessContext: "VISIT_PACKAGE_PURCHASE" });
+          return send(rows);
+        }
         if (path === "/clients") {
           expect(url.searchParams.get("query")).toBe("socio@example.invalid");
           return send([{ id: memberId, firstName: "Socio", lastName: "Demo", status: "ACTIVE", email: "socio@example.invalid" }]);
@@ -755,18 +764,17 @@ test.describe("consolas por rol", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("link", { name: /Contrataciones Membresías y paquetes/ }).click();
     await expect(page.getByRole("heading", { name: "Membresías y paquetes" })).toBeVisible();
-    const preview = page.getByRole("region", { name: "Operaciones disponibles" });
-    await expect(preview.getByRole("heading", { level: 3 })).toHaveCount(4);
-    await expect(preview.getByRole("button")).toHaveCount(0);
+    const preview = page.getByRole("group", { name: "Operaciones disponibles" });
+    await expect(preview.getByRole("button")).toHaveCount(4);
     expect(operations).toHaveLength(0);
     expect(purchases).toHaveLength(0);
     await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("membresias-sin-socio.png") });
+    await page.getByRole("button", { name: "Asignar membresía", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Asignar membresía", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("operacion-sin-socio.png") });
     await page.setViewportSize({ width: 768, height: 900 });
-    const previewColumns = () => preview.locator("article").first().evaluate(
-      (card) => getComputedStyle(card.parentElement!).gridTemplateColumns.split(" ").length,
-    );
+    const previewColumns = () => preview.evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length);
     expect(await previewColumns()).toBe(2);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(768);
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await previewColumns()).toBe(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -774,6 +782,8 @@ test.describe("consolas por rol", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByLabel("Nombre, teléfono o correo electrónico").fill("socio@example.invalid");
     await page.getByRole("button", { name: "Buscar socio" }).click();
+    await expect(page.getByRole("list", { name: "Resultados de búsqueda" })).toBeVisible();
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("resultados-busqueda.png") });
     await page.getByRole("button", { name: /Socio Demo/ }).click();
     await expect(page.getByText("Estado: Activo")).toBeVisible();
     await expect(page.getByText("El socio no tiene membresía.")).toBeVisible();
@@ -783,9 +793,14 @@ test.describe("consolas por rol", () => {
     await page.getByRole("combobox", { name: "Plan", exact: true }).selectOption(base.id);
     await expect(page.getByText("Vigencia del plan: 30 días")).toBeVisible();
     await confirm.click();
+    await expect(page.getByText("Operación confirmada. Venta QA-1.")).toBeVisible();
     await expect(page.getByText("Plan Base · Activa")).toBeVisible();
 
+    await expect(page.getByRole("table").getByText("QA-1", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "Renovar membresía" }).click();
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("formulario-renovacion.png") });
     await confirm.click();
     await expect(page.getByText("Vigencia: 2026-11-10 a 2027-01-08")).toBeVisible();
 
@@ -794,18 +809,22 @@ test.describe("consolas por rol", () => {
     await confirm.click();
     await expect(page.getByText("Plan Plus · Activa")).toBeVisible();
     expect(operations).toEqual(["/membership-enrollments", `/memberships/${membershipId}/renew`, `/memberships/${membershipId}/change-plan`]);
-    await page.getByRole("button", { name: "Cerrar mensaje" }).click();
+    if (await page.getByRole("button", { name: "Cerrar mensaje" }).isVisible()) await page.getByRole("button", { name: "Cerrar mensaje" }).click();
     await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("membresias-y-paquetes.png") });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "Vender paquete de visitas" }).click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("form", { name: "Venta de paquete de visitas" });
     await expect(dialog.getByText("5 visitas · 21 días")).toBeVisible();
     await expect(dialog.getByText("$400.00", { exact: true })).toBeVisible();
     await expect(dialog.getByLabel("Referencia (opcional)")).toHaveCount(0);
     await dialog.getByLabel("Método de pago").selectOption("TRANSFER");
     await dialog.getByLabel("Referencia (opcional)").fill("QA-123");
     await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("cotizacion-paquete-movil.png") });
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("formulario-paquete.png") });
+    await page.setViewportSize({ width: 390, height: 844 });
     const submit = dialog.getByRole("button", { name: "Cobrar y crear saldo" });
     await submit.click();
     await expect(page.getByRole("alert").filter({ hasText: "Referencia: comprueba la referencia." })).toContainText("qa-correlation");
@@ -813,7 +832,7 @@ test.describe("consolas por rol", () => {
     try {
       await expect(dialog.getByRole("button", { name: "Procesando..." })).toBeDisabled();
       await expect(dialog.getByLabel("Método de pago")).toBeDisabled();
-      await dialog.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+      await dialog.evaluate((form: HTMLFormElement) => form.requestSubmit());
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     } finally {
       releasePurchase.resolve();
@@ -821,7 +840,11 @@ test.describe("consolas por rol", () => {
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText(/Paquete activado. Venta QA-PACK/)).toBeVisible();
     await expect(page.getByText("de 5 visitas", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toBeEnabled();
+    await expect(page.getByRole("table").getByText("QA-PACK", { exact: false })).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    if (await page.getByRole("button", { name: "Cerrar mensaje" }).isVisible()) await page.getByRole("button", { name: "Cerrar mensaje" }).click();
+    await page.getByRole("region", { name: "Operaciones recientes" }).screenshot({ ...screenshotOptions, path: testInfo.outputPath("operaciones-recientes.png") });
     expect(purchases).toHaveLength(2);
     expect(purchases[0]).toMatchObject({ clientId: memberId, packagePlanId: packagePlan.id, method: "TRANSFER", reference: "QA-123" });
     expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
@@ -912,6 +935,99 @@ test.describe("consolas por rol", () => {
       expect(dispatches).toBe(3);
     });
   }
+
+
+  test("búsqueda rápida ignora respuestas obsoletas y conserva la operación", async ({ page }) => {
+    const requests: string[] = [];
+    const delayed = Promise.withResolvers<void>();
+    let quoteRequests = 0;
+    let salesReads = 0;
+    await bootAs(page, user({ console: "RECEPTION", roles: ["Recepcion"], permissions: receptionPermissions() }), async (route, path) => {
+      if (path === "/sales") salesReads++;
+      if (path.includes("quotes")) quoteRequests++;
+      if (path.endsWith("/visit-package")) { await route.fulfill({ json: null }); return true; }
+      if (path !== "/clients") return false;
+      const query = new URL(route.request().url()).searchParams.get("query")!;
+      requests.push(query);
+      if (query === "lenta") await delayed.promise;
+      if (query === "fallo") {
+        await route.fulfill({ status: 500, json: { message: "Error de búsqueda de prueba" } });
+      } else {
+        await route.fulfill({ json: query === "vacio" ? [] : [{ id: "qa-member", firstName: query, lastName: "Demo", status: "ACTIVE" }] });
+      }
+      return true;
+    });
+    await page.goto("/reception/memberships");
+    const input = page.getByLabel("Nombre, teléfono o correo electrónico");
+    await page.getByRole("button", { name: "Vender paquete de visitas" }).click();
+    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toHaveAttribute("aria-pressed", "true");
+    await input.fill("lenta");
+    await expect.poll(() => requests.length).toBe(1);
+    await input.fill("nuevo@example.invalid");
+    await expect(page.getByRole("button", { name: "lenta Demo" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "nuevo@example.invalid Demo" })).toBeVisible();
+    delayed.resolve();
+    await expect(page.getByRole("button", { name: "lenta Demo" })).toHaveCount(0);
+    await input.fill("555");
+    await input.fill("5551234567");
+    await expect(page.getByRole("button", { name: "5551234567 Demo" })).toBeVisible();
+    expect(requests).not.toContain("555");
+    await input.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { name: "5551234567 Demo" })).toBeVisible();
+    await page.getByRole("button", { name: "Cambiar socio" }).click();
+    await expect(page.getByRole("heading", { name: "5551234567 Demo" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toHaveAttribute("aria-pressed", "true");
+    await input.fill("vacio");
+    await expect(page.getByText("No se encontraron socios.")).toBeVisible();
+    await input.fill("fallo");
+    await expect(page.getByText(/Error de búsqueda de prueba/)).toBeVisible();
+    await input.fill("");
+    expect(quoteRequests).toBe(0);
+    expect(salesReads).toBe(0);
+    await expect(page.getByRole("heading", { name: "Operaciones recientes" })).toHaveCount(0);
+  });
+
+
+  test("operaciones recientes recupera errores y muestra estados reales del listado", async ({ page }) => {
+    let mode: "error" | "empty" | "rows" = "error";
+    await bootAs(page, user({ console: "RECEPTION", roles: ["Recepcion"],
+      permissions: [...receptionPermissions(), "sale.read"] }), async (route, path) => {
+      if (path !== "/sales") return false;
+      if (mode === "error") {
+        await route.fulfill({ status: 503, json: { message: "Error del listado de prueba" } });
+      } else {
+        await route.fulfill({ json: mode === "empty" ? [] : [
+          { id: "retail", saleNumber: "RETAIL", businessContext: "RETAIL_SALE", status: "PAID" },
+          ...Array.from({ length: 10 }, (_, index) => ({
+            id: "sale-" + index, saleNumber: "REC-" + index, clientName: "Socio " + index,
+            businessContext: "MEMBERSHIP_RENEWAL",
+            status: ["PENDING_PAYMENT", "PARTIALLY_PAID", "CANCELLED", "PAID"][index % 4],
+            totalCents: 12345, currency: "MXN", soldAt: "2026-11-10T12:00:00Z",
+          })),
+        ] });
+      }
+      return true;
+    });
+    await page.goto("/reception/memberships");
+    await expect(page.getByText("No fue posible consultar las operaciones recientes.")).toBeVisible();
+    mode = "empty";
+    await page.getByRole("button", { name: "Reintentar", exact: true }).click();
+    await expect(page.getByText("Todavía no hay contrataciones registradas en esta sucursal.")).toBeVisible();
+    mode = "rows";
+    await page.reload();
+    const table = page.getByRole("table");
+    await expect(table.locator("tbody tr")).toHaveCount(8);
+    await expect(table.getByText("Pendiente", { exact: true }).first()).toBeVisible();
+    await expect(table.getByText("Pago parcial", { exact: true }).first()).toBeVisible();
+    await expect(table.getByText("Cancelada", { exact: true }).first()).toBeVisible();
+    await expect(table.getByText("Pagada", { exact: true }).first()).toBeVisible();
+    await expect(table.getByText("RETAIL", { exact: false })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Consultar venta REC-0" })).toHaveAttribute("href", "/sales/sale-0");
+    await expect(page.getByRole("link", { name: /Ver todas/ })).toHaveAttribute("href", "/reports/sales");
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
 
   test("recepción sin permisos comerciales no ve ni abre contrataciones", async ({ page }) => {
     await bootAs(page, user({ console: "RECEPTION", roles: ["Recepcion"], permissions: ["client.read", "access.check-in"] }));

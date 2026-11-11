@@ -4,7 +4,6 @@ import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ReceptionPointRecovery, useReceptionPoint } from "@/components/ReceptionPointRecovery";
 import { runSaleWrite } from "@/lib/sale-write";
-import { packageOperation, ReceptionOperationCard } from "@/components/ReceptionOperationCard";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppNotice } from "@/components/AppNotice";
 import { contractErrorMessage } from "@/lib/contract-error";
@@ -26,11 +25,17 @@ export function VisitPackageCard({
   clientName,
   session,
   source = "profile",
+  selected = false,
+  onSaleRecorded,
+  onBusyChange,
 }: {
   clientId: string;
   clientName: string;
   session: StoredSession;
   source?: "profile" | "reception";
+  selected?: boolean;
+  onSaleRecorded?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const point = useReceptionPoint(session, clientId, "package");
   const [plans, setPlans] = useState<VisitPackagePlanSummary[]>([]);
@@ -41,15 +46,21 @@ export function VisitPackageCard({
   const [reference, setReference] = useState("");
   const [manualCardEnabled, setManualCardEnabled] = useState(false);
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
+  const [previousSelection, setPreviousSelection] = useState(selected);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const purchaseFormRef = useRef<HTMLFormElement>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
   const visibleQuote = quote?.packagePlanId === selectedPlanId ? quote : null;
   const usesReference = method === "TRANSFER" || method === "CARD_MANUAL";
+  if (previousSelection !== selected) {
+    setPreviousSelection(selected);
+    setQuote(null);
+  }
   const canSell = Boolean(session.user.branchId) && hasPermission(session, "sale.create");
 
   useEffect(() => {
@@ -82,14 +93,20 @@ export function VisitPackageCard({
     return () => { active = false; };
   }, [canSell, clientId, session]);
 
+  const purchaseOpen = source === "reception" ? selected && !current && !point.pending && !loading && !refreshFailed && plans.length > 0 && canSell : open;
+
   useEffect(() => {
-    if (!open || !selectedPlanId || current) return;
+    if (!purchaseOpen || !selectedPlanId || current) return;
     let active = true;
     quoteVisitPackage(session.accessToken, clientId, selectedPlanId)
       .then((result) => { if (active) setQuote(result); })
       .catch((exception) => { if (active) setError(contractErrorMessage(exception, "No fue posible cotizar el paquete.")); });
     return () => { active = false; };
-  }, [clientId, current, open, selectedPlanId, session.accessToken]);
+  }, [clientId, current, purchaseOpen, selectedPlanId, session.accessToken]);
+
+  useEffect(() => {
+    if (source === "reception" && purchaseOpen) purchaseFormRef.current?.focus();
+  }, [source, purchaseOpen]);
 
   function beginPurchase() {
     setError(null);
@@ -103,6 +120,7 @@ export function VisitPackageCard({
     if (inFlight.current || !canSell || point.pending || !visibleQuote || current || refreshFailed) return;
     inFlight.current = true;
     setSaving(true);
+    onBusyChange?.(true);
     setError(null);
     const paymentReference = usesReference ? reference.trim() : "";
     try {
@@ -117,6 +135,7 @@ export function VisitPackageCard({
       const result = await runSaleWrite(session, `reception-package:${clientId}`, payload,
         (idempotencyKey) => purchaseVisitPackage(session.accessToken, { ...payload, idempotencyKey }));
       setOpen(false);
+      onSaleRecorded?.();
       setReference("");
       setMethod("CASH");
       if (method === "CARD_MERCADO_PAGO" && result.saleStatus === "PENDING_PAYMENT") {
@@ -132,6 +151,7 @@ export function VisitPackageCard({
     } finally {
       inFlight.current = false;
       setSaving(false);
+      onBusyChange?.(false);
     }
   }
 
@@ -147,6 +167,7 @@ export function VisitPackageCard({
 
   async function sendPoint(sale: Parameters<typeof point.send>[0]) {
     setError(null);
+    onBusyChange?.(true);
     try {
       const message = await point.send(sale);
       if (message) setMessage(message);
@@ -154,6 +175,7 @@ export function VisitPackageCard({
       setError(contractErrorMessage(exception, "Consulta el estado de la venta en el historial."));
     } finally {
       await refreshPackage();
+      onBusyChange?.(false);
     }
   }
 
@@ -161,10 +183,10 @@ export function VisitPackageCard({
   const purchaseDisabled = loading || saving || refreshFailed || plans.length === 0;
   const summary = (
     <>
-      {error && !open ? <AppNotice message={error} tone="error" /> : null}
+      {error && !purchaseOpen ? <AppNotice message={error} tone="error" /> : null}
       {point.pending && canSell ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
         canReadSale={hasPermission(session, "sale.read")}
-        onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
+        onRetry={() => { if (point.pending) void sendPoint(point.pending).finally(onSaleRecorded); }} /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
       {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando saldo...</p> : null}
       {!loading && current ? (
@@ -187,31 +209,10 @@ export function VisitPackageCard({
     </>
   );
 
-  return (
-    <>
-      {source === "reception" ? (
-        <ReceptionOperationCard {...packageOperation} disabled={!canOpenPurchase || purchaseDisabled} onSelect={beginPurchase}>
-          {summary}
-        </ReceptionOperationCard>
-      ) : (
-        <section className="app-card grid gap-4 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="app-eyebrow">Accesos consumibles</p>
-              <h2 className="app-card-title">Paquete de visitas</h2>
-            </div>
-            {canOpenPurchase ? (
-              <button className="app-button h-9" disabled={purchaseDisabled} type="button" onClick={beginPurchase}>Vender paquete</button>
-            ) : null}
-          </div>
-          {summary}
-        </section>
-      )}
-
-      <AppDrawer onClose={() => { if (!inFlight.current) setOpen(false); }} open={open} title="Vender paquete de visitas">
-        <form onSubmit={submit}>
-          <fieldset className="grid gap-4" disabled={saving}>
-            <p className="text-sm">Socio: <strong>{clientName}</strong></p>
+  const purchaseForm = (
+        <form aria-label="Venta de paquete de visitas" onSubmit={submit} ref={purchaseFormRef} tabIndex={-1}>
+          <fieldset className={source === "reception" ? "grid gap-4 md:grid-cols-2" : "grid gap-4"} disabled={saving}>
+            <p className={source === "reception" ? "text-sm md:col-span-2" : "text-sm"}>Socio: <strong>{clientName}</strong></p>
             {error ? <AppNotice message={error} tone="error" /> : null}
             <label className="form-field" htmlFor="visitPackagePlan">
               <span>Paquete</span>
@@ -243,9 +244,40 @@ export function VisitPackageCard({
                 <input className="app-input" maxLength={160} value={reference} onChange={(event) => setReference(event.target.value)} />
               </label>
             ) : null}
-            <button className="app-button h-11" disabled={saving || !visibleQuote} type="submit">{saving ? "Procesando..." : "Cobrar y crear saldo"}</button>
+            <button className={source === "reception" ? "app-button h-11 md:col-span-2" : "app-button h-11"} disabled={saving || !visibleQuote} type="submit">{saving ? "Procesando..." : "Cobrar y crear saldo"}</button>
           </fieldset>
         </form>
+      );
+
+  return (
+    <>
+      {source === "reception" ? (
+        <>
+          {current || point.pending || loading || error || message || selected ? (
+            <section className="app-card grid gap-3 p-4">
+              {summary}
+              {selected && !purchaseOpen && !loading ? <p role="status" className="text-sm">La venta requiere un socio sin paquete activo o pendiente y un catálogo disponible.</p> : null}
+              {purchaseOpen ? <><h2 className="app-card-title">Vender paquete de visitas</h2>{purchaseForm}</> : null}
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <section className="app-card grid gap-4 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="app-eyebrow">Accesos consumibles</p>
+              <h2 className="app-card-title">Paquete de visitas</h2>
+            </div>
+            {canOpenPurchase ? (
+              <button className="app-button h-9" disabled={purchaseDisabled} type="button" onClick={beginPurchase}>Vender paquete</button>
+            ) : null}
+          </div>
+          {summary}
+        </section>
+      )}
+
+      <AppDrawer onClose={() => { if (!inFlight.current) setOpen(false); }} open={source === "profile" && open} title="Vender paquete de visitas">
+        {purchaseForm}
       </AppDrawer>
     </>
   );

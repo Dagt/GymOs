@@ -62,7 +62,7 @@ posteriores sólo vuelve a cobrarla cuando
 baja automática no altera esta regla.
 
 El dashboard `/reception` enlaza a «Membresías y paquetes» en `/reception/memberships`.
-La tarjeta de contrataciones se destaca cuando el rol tiene acceso. También se puede abrir desde el menú lateral. Las cuatro operaciones se muestran antes de seleccionar al socio. El expediente muestra el paquete vigente o pendiente y agrupa los accesos por origen. La pantalla busca al socio,
+La tarjeta de contrataciones se destaca cuando el rol tiene acceso. También se puede abrir desde el menú lateral. Las cuatro operaciones pueden seleccionarse antes de buscar al socio o después. La búsqueda rápida conserva la operación seleccionada y descarta respuestas obsoletas. El listado de ventas aporta las últimas contrataciones de la sucursal para perfiles con sale.read. El expediente muestra el paquete vigente o pendiente y agrupa los accesos por origen. La pantalla busca al socio,
 muestra la membresía y el saldo del paquete, y cotiza las operaciones
 habilitadas por los permisos de la sesión. La ficha y recepción comparten
 el formulario de venta de paquetes. Los marcadores de `/reception/renewals`
