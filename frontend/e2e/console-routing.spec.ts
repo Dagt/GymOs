@@ -796,7 +796,7 @@ test.describe("consolas por rol", () => {
     await expect(page.getByText("Operación confirmada. Venta QA-1.")).toBeVisible();
     await expect(page.getByText("Plan Base · Activa")).toBeVisible();
 
-    await expect(page.getByRole("table").getByText("QA-1", { exact: false })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Operaciones recientes" })).toHaveCount(0);
     await page.getByRole("button", { name: "Renovar membresía" }).click();
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -820,7 +820,7 @@ test.describe("consolas por rol", () => {
     await expect(dialog.getByLabel("Referencia (opcional)")).toHaveCount(0);
     await dialog.getByLabel("Método de pago").selectOption("TRANSFER");
     await dialog.getByLabel("Referencia (opcional)").fill("QA-123");
-    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("cotizacion-paquete-movil.png") });
+    await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath("cotizacion-paquete-movil.png") });
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("formulario-paquete.png") });
@@ -841,10 +841,20 @@ test.describe("consolas por rol", () => {
     await expect(page.getByText(/Paquete activado. Venta QA-PACK/)).toBeVisible();
     await expect(page.getByText("de 5 visitas", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toBeEnabled();
-    await expect(page.getByRole("table").getByText("QA-PACK", { exact: false })).toBeVisible();
+
     await page.setViewportSize({ width: 1440, height: 900 });
     if (await page.getByRole("button", { name: "Cerrar mensaje" }).isVisible()) await page.getByRole("button", { name: "Cerrar mensaje" }).click();
-    await page.getByRole("region", { name: "Operaciones recientes" }).screenshot({ ...screenshotOptions, path: testInfo.outputPath("operaciones-recientes.png") });
+
+    // Reproduce the reported layout with a current membership and an active visit balance.
+    await page.getByRole("button", { name: "Renovar membresía", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Confirmar operación" })).toBeEnabled();
+    for (const [width, height] of [[1440, 1200], [768, 1024], [390, 844]]) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath(`renovacion-con-paquete-${width}.png`) });
+    }
+
     expect(purchases).toHaveLength(2);
     expect(purchases[0]).toMatchObject({ clientId: memberId, packagePlanId: packagePlan.id, method: "TRANSFER", reference: "QA-123" });
     expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
@@ -989,44 +999,21 @@ test.describe("consolas por rol", () => {
   });
 
 
-  test("operaciones recientes recupera errores y muestra estados reales del listado", async ({ page }) => {
-    let mode: "error" | "empty" | "rows" = "error";
+  test("membresías omite actividad reciente y no consulta ventas", async ({ page }) => {
+    let salesQueries = 0;
     await bootAs(page, user({ console: "RECEPTION", roles: ["Recepcion"],
       permissions: [...receptionPermissions(), "sale.read"] }), async (route, path) => {
       if (path !== "/sales") return false;
-      if (mode === "error") {
-        await route.fulfill({ status: 503, json: { message: "Error del listado de prueba" } });
-      } else {
-        await route.fulfill({ json: mode === "empty" ? [] : [
-          { id: "retail", saleNumber: "RETAIL", businessContext: "RETAIL_SALE", status: "PAID" },
-          ...Array.from({ length: 10 }, (_, index) => ({
-            id: "sale-" + index, saleNumber: "REC-" + index, clientName: "Socio " + index,
-            businessContext: "MEMBERSHIP_RENEWAL",
-            status: ["PENDING_PAYMENT", "PARTIALLY_PAID", "CANCELLED", "PAID"][index % 4],
-            totalCents: 12345, currency: "MXN", soldAt: "2026-11-10T12:00:00Z",
-          })),
-        ] });
-      }
+      salesQueries++;
+      await route.fulfill({ json: [] });
       return true;
     });
     await page.goto("/reception/memberships");
-    await expect(page.getByText("No fue posible consultar las operaciones recientes.")).toBeVisible();
-    mode = "empty";
-    await page.getByRole("button", { name: "Reintentar", exact: true }).click();
-    await expect(page.getByText("Todavía no hay contrataciones registradas en esta sucursal.")).toBeVisible();
-    mode = "rows";
-    await page.reload();
-    const table = page.getByRole("table");
-    await expect(table.locator("tbody tr")).toHaveCount(8);
-    await expect(table.getByText("Pendiente", { exact: true }).first()).toBeVisible();
-    await expect(table.getByText("Pago parcial", { exact: true }).first()).toBeVisible();
-    await expect(table.getByText("Cancelada", { exact: true }).first()).toBeVisible();
-    await expect(table.getByText("Pagada", { exact: true }).first()).toBeVisible();
-    await expect(table.getByText("RETAIL", { exact: false })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Consultar venta REC-0" })).toHaveAttribute("href", "/sales/sale-0");
-    await expect(page.getByRole("link", { name: /Ver todas/ })).toHaveAttribute("href", "/reports/sales");
-    await page.setViewportSize({ width: 390, height: 844 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await expect(page.getByRole("group", { name: "Operaciones disponibles" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Operaciones recientes" })).toHaveCount(0);
+    await expect(page.getByRole("table")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Ver todas/ })).toHaveCount(0);
+    expect(salesQueries).toBe(0);
   });
 
   test("recepción sin permisos comerciales no ve ni abre contrataciones", async ({ page }) => {

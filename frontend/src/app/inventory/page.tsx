@@ -81,8 +81,6 @@ export default function InventoryPage() {
               <InventoryMovementSummary
                 selectedStock={controller.selectedStock}
                 onOpenDrawer={() => controller.setShowMovementDrawer(true)}
-                onOpenPhysicalCountDrawer={() => controller.setShowPhysicalCountDrawer(true)}
-                onOpenTransferDrawer={() => controller.setShowTransferDrawer(true)}
               />
               {controller.lowStockList.error ? <InventoryListFailure title="Alertas de stock" onRetry={controller.lowStockList.refresh} /> : <InventoryAlertsPanel
                 lowStock={controller.lowStockList.items}

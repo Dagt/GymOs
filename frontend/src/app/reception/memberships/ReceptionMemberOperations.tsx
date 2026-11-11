@@ -191,8 +191,8 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
 
   return (
     <div className="grid min-w-0 gap-3">
-      <section className="app-card grid gap-3 p-4 md:grid-cols-2">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="app-card reception-member">
+        <div className="reception-member-identity">
           <div>
             <p className="app-eyebrow">Socio seleccionado</p>
             <h2 className="app-card-title">{clientName}</h2>
@@ -200,7 +200,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
           </div>
           <button className="app-button-secondary" disabled={processing || point.sending} onClick={onClear} type="button">Cambiar socio</button>
         </div>
-        <div className="rounded-lg bg-[var(--brand-surface)] p-4">
+        <div className="reception-membership-status">
           <h3 className="app-eyebrow">Membresía actual</h3>
           {loading ? <p>Cargando membresía…</p> : membership ? (
             <>
@@ -209,8 +209,8 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
             </>
           ) : <p>{membership === null ? "El socio no tiene membresía." : "Membresía no disponible."}</p>}
         </div>
-        {message ? <AppNotice message={message} tone="success" /> : null}
-        {error ? <AppNotice message={error} tone="error" /> : null}
+        {message ? <AppNotice inline message={message} tone="success" /> : null}
+        {error ? <AppNotice inline message={error} tone="error" /> : null}
         {point.pending && capabilities.canEnroll ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
           canReadSale={session.user.permissions.includes("sale.read")}
           onRetry={() => { if (point.pending) void sendPoint(point.pending).finally(onSaleRecorded); }} /> : null}
@@ -223,51 +223,57 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
           <p role="status" className="app-card p-4 text-sm">Esta operación requiere {operation === "enroll" ? "un socio sin membresía actual y permiso de venta" : operation === "change" ? "una membresía activa y permiso para cambiar el plan" : "una membresía activa o vencida y permiso de renovación"}. Revisa la membresía del socio o elige otra operación.</p>
         ) : null}
         {canExecuteMembership && operation ? (
-          <form className="app-card p-4" onSubmit={submit} ref={operationForm} tabIndex={-1}>
-            <fieldset className="grid gap-3 rounded-lg border border-[var(--brand-line)] p-4" disabled={processing}>
-              <legend className="px-1 font-semibold">{membershipOperations[operation].title}</legend>
-              <p className="text-sm">Socio {clientName}</p>
-              {operation !== "renew" ? (
-                <label className="form-field">
-                  <span>Plan</span>
-                  <select className="app-input" value={selectedPlanId} onChange={(event) => {
-                    setSelectedPlanId(event.target.value);
-                    setQuote(null);
-                    setQuoteError(null);
-                    setError(null);
-                  }}>
-                    <option value="">Selecciona un plan</option>
-                    {eligiblePlans.filter((plan) => plan.status === "ACTIVE").map((plan) =>
-                      <option key={plan.id} value={plan.id}>{plan.name}</option>)}
-                  </select>
-                </label>
-              ) : <p className="font-semibold">{membership?.planName}</p>}
-              {durationDays ? <p className="text-sm">Vigencia del plan: {durationDays} días</p> : null}
-              {quoteError ? <AppNotice message={quoteError} tone="error" /> : null}
-              <MembershipQuoteSummary loading={Boolean(targetPlanId && !visibleQuote && !quoteError)} quote={visibleQuote} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="form-field">
-                  <span>Método de pago</span>
-                  <select className="app-input" value={method} onChange={(event) => {
-                    setMethod(event.target.value as PaymentMethod);
-                    setReference("");
-                  }}>
-                    <option value="CASH">Efectivo</option>
-                    <option value="TRANSFER">Transferencia</option>
-                    {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
-                    {pointEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
-                  </select>
-                </label>
-                {usesReference ? (
+          <form className="app-card reception-contract" onSubmit={submit} ref={operationForm} tabIndex={-1}>
+            <fieldset className="reception-contract-grid" disabled={processing}>
+              <legend className="reception-contract-title">{membershipOperations[operation].title}</legend>
+              <div className="reception-contract-fields">
+                <p className="reception-form-hint">Revisa el plan y selecciona cómo se realizará el pago.</p>
+                {operation !== "renew" ? (
                   <label className="form-field">
-                    <span>Referencia (opcional)</span>
-                    <input className="app-input" maxLength={160} value={reference} onChange={(event) => setReference(event.target.value)} />
+                    <span>Plan</span>
+                    <select className="app-input" value={selectedPlanId} onChange={(event) => {
+                      setSelectedPlanId(event.target.value);
+                      setQuote(null);
+                      setQuoteError(null);
+                      setError(null);
+                    }}>
+                      <option value="">Selecciona un plan</option>
+                      {eligiblePlans.filter((plan) => plan.status === "ACTIVE").map((plan) =>
+                        <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+                    </select>
                   </label>
-                ) : null}
+                ) : <p className="font-semibold">{membership?.planName}</p>}
+                {durationDays ? <p className="text-sm">Vigencia del plan: {durationDays} días</p> : null}
+                {quoteError ? <AppNotice inline message={quoteError} tone="error" /> : null}
+                <div className={usesReference ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
+                  <label className="form-field">
+                    <span>Método de pago</span>
+                    <select className="app-input" value={method} onChange={(event) => {
+                      setMethod(event.target.value as PaymentMethod);
+                      setReference("");
+                    }}>
+                      <option value="CASH">Efectivo</option>
+                      <option value="TRANSFER">Transferencia</option>
+                      {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
+                      {pointEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
+                    </select>
+                  </label>
+                  {usesReference ? (
+                    <label className="form-field">
+                      <span>Referencia (opcional)</span>
+                      <input className="app-input" maxLength={160} value={reference} onChange={(event) => setReference(event.target.value)} />
+                    </label>
+                  ) : null}
+                </div>
               </div>
-              <button className="app-button" disabled={processing || !visibleQuote} type="submit">
-                {processing ? "Procesando…" : "Confirmar operación"}
-              </button>
+              <aside className="reception-checkout" aria-label="Resumen del cobro">
+                <h3>Resumen del cobro</h3>
+                <MembershipQuoteSummary detailed loading={Boolean(targetPlanId && !visibleQuote && !quoteError)} quote={visibleQuote} />
+                {!targetPlanId ? <p className="reception-form-hint">Selecciona un plan para consultar el total.</p> : null}
+                <button className="app-button" disabled={processing || !visibleQuote} type="submit">
+                  {processing ? "Procesando…" : "Confirmar operación"}
+                </button>
+              </aside>
             </fieldset>
           </form>
         ) : null}

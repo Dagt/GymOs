@@ -350,3 +350,15 @@ operativa. Evidencia y estado del gate en [#61](https://github.com/Dagt/GymOs/is
 SAL-001 incorpora bloqueos transaccionales y recuperación de ventas, pagos y webhooks. La aceptación operativa de cobros integrados sigue sujeta a Stripe test y a comprobar Point antes de su habilitación.
 
 La corrección SAL-001 rechaza órdenes Point sin evidencia de moneda o importe pagado. La prueba HTTP con PostgreSQL usa respuestas simuladas de Point. Sigue pendiente la comprobación con proveedor conectado.
+
+## Pulido de membresías — 10/11/2026
+
+Rama `codex/reception-memberships-visual-polish`, base main `36b50d545eb3def2871b3c2211872f5329373b04` tras merge #73. Presentación de recepción con evidencia de escritorio, tablet y móvil; entrega sin merge ni despliegue. [Resultados locales y límites](../docs/testing/reception-memberships-polish.md).
+
+## Continuación UX del PR #74
+
+Sobre codex/reception-memberships-visual-polish, SHA inicial e534bdc809487fce23ca1424168be6c1c67e03f0. Se integra inventario, transferencias, filtros y retiro de actividad reciente de membresías sin sustituir el trabajo previo. SHA final, comandos y capturas en el PR y [verificación](../docs/testing/ux-commercial-consistency.md). Sin merge.
+
+PR #74 continúa desde aef03176 en la misma rama; seguimiento de alturas, cien resultados y acento inferior en docs/testing/commercial-layout-followup.md.
+
+PR #74 continúa desde e951764a para corregir sincronización de tema/sesión. Reproducción, resultados y evidencia de carga directa: docs/testing/tenant-theme-session-sync.md. SHA final en el PR, sin merge.

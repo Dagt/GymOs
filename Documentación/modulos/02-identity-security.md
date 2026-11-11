@@ -92,3 +92,5 @@ Recuperación del equipo, propiedades y límites:
 ## Roles asignados y autoridades
 
 Un rol local sólo es visible y asignable en su organización aunque esté marcado como rol de sistema. Las plantillas globales conservan su ámbito de cuenta. La emisión de JWT y el cambio de sede ignoran vínculos de rol ajenos o eliminados y permisos retirados. [Matriz de aislamiento](../../docs/security/multi-tenant-verification.md).
+
+PR #74: storeCurrentUser notifica con el evento de sesión existente y exige igualdad de contexto; los consumidores asíncronos pueden exigir el snapshot activo. Logout también notifica limpieza, sin persistir credenciales o temas.

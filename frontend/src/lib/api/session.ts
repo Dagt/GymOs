@@ -13,16 +13,28 @@ export function storeSession(value: AuthResponse) {
   window.dispatchEvent(new Event("gymos.session-refreshed"));
 }
 
-export function storeCurrentUser(user: CurrentUser) {
-  if (session) session = { ...session, user };
+export function storeCurrentUser(user: CurrentUser, expected?: StoredSession) {
+  if (!session || (expected && session !== expected) || !sameUserContext(session.user, user)) return false;
+  if (session.user === user) return true;
+  session = { ...session, user };
+  window.dispatchEvent(new Event("gymos.session-refreshed"));
+  return true;
+}
+
+export function sameUserContext(previous: CurrentUser, next: CurrentUser) {
+  return previous.userId === next.userId && previous.accountScope === next.accountScope
+    && previous.organizationId === next.organizationId && previous.branchId === next.branchId
+    && previous.supportMode === next.supportMode;
 }
 
 export function clearSession() {
+  const hadSession = session !== null;
   session = null;
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(SESSION_SLOT_KEY);
   clearRefreshOperation();
   clearLegacySession();
+  if (hadSession) window.dispatchEvent(new Event("gymos.session-refreshed"));
 }
 
 export function clearLegacySession() {

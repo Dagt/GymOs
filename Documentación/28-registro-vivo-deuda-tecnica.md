@@ -165,3 +165,15 @@ Los 7 epics #21–27 y 32 issues #28–59 convierten deuda y producto pendiente 
 Pendientes del piloto tras SAL-001 (#33). Conciliar cobros integrados abiertos de la versión anterior a V106, validar Point en entorno de pruebas y acreditar Stripe/kiosco con #34. Los reembolsos de proveedor requieren un proceso conciliado y la política de paquetes parcialmente consumidos sigue en ADR-002 y #35.
 
 Point mantiene pendientes las órdenes que carecen de moneda o importe pagado verificables. Falta confirmar esos campos con una cuenta conectada de pruebas. Consulta el [runbook de conciliación](../docs/operations/sales-integrity.md).
+
+## Seguimiento visual de recepción — 10/11/2026
+
+Se corrige la composición dispareja de membresías y el fondo secundario heredado de CSS global mediante estilos acotados. Falta aceptación visual del usuario; no cierra los gates conectados de SAL-001. [Verificación](../docs/testing/reception-memberships-polish.md).
+
+## Consistencia visual acotada (PR #74)
+
+Corregidos ancho del selector de transferencias y alineación de filtros del catálogo. Se mantienen cambios locales; la cascada global de globals.css con múltiples overrides y el foco de otros drawers requieren una tarea independiente, no un rediseño global en esta entrega.
+
+Seguimiento PR #74: se corrigen alturas independientes de resumen/filtros y se restaura el acento inferior retirado por normalización local. La cascada global sigue fuera de alcance.
+
+Tema inicial (PR #74): reproducción con restoreSession retrasado confirmó un efecto dependiente sólo de pathname. Se sincroniza con la sesión; no se introduce caché visual ni polling.

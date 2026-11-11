@@ -136,3 +136,13 @@ de la sucursal. Se respeta la gracia vigente y se registra el ID de la membresí
 que concede ese derecho. La membresía tiene prioridad sobre el paquete para el
 mismo beneficio. La reversión de una entrada por membresía conserva la vigencia
 y registra la corrección operativa. Ver [Access](10-access.md).
+
+## Pulido de recepción — 10/11/2026
+
+La pantalla usa acciones centradas, resumen compacto y cobro con total destacado en un panel lateral adaptable. Cotizaciones, permisos y recuperación de Point conservan sus contratos. [Evidencia y límites](../../docs/testing/reception-memberships-polish.md).
+
+## Recepción enfocada en contratación (PR #74)
+
+Se retira Operaciones recientes y su consulta exclusiva de ventas. Permanecen ambos órdenes de selección y los cuatro contratos. La selección usa acento de marca e icono de confirmación; avisos locales evitan tapar la confirmación al reintentar.
+
+Se restaura el acento inferior de marca y el resplandor tenue en las acciones primarias de contratación.

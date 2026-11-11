@@ -1,5 +1,7 @@
 "use client";
 
+import controls from "@/components/CommercialControls.module.css";
+import styles from "./memberships.module.css";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
@@ -10,7 +12,6 @@ import { contractErrorMessage } from "@/lib/contract-error";
 import { canAccessRoute } from "@/lib/role-model";
 import { operations, ReceptionOperationCard, type ReceptionOperation } from "@/components/ReceptionOperationCard";
 import { resolveClientMembershipCapabilities } from "@/app/clients/[clientId]/client-membership-permissions";
-import { RecentReceptionSales } from "./RecentReceptionSales";
 import { ReceptionMemberOperations } from "./ReceptionMemberOperations";
 
 export default function ReceptionMembershipsPage() {
@@ -54,7 +55,6 @@ function MemberSearch({ session }: { session: StoredSession }) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const firstResult = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -123,8 +123,9 @@ function MemberSearch({ session }: { session: StoredSession }) {
   }
 
   return (
-    <div className="grid w-full min-w-0 gap-4">
-      <section className="app-card grid gap-3 p-4">
+    <div className={`${styles.workspace} ${controls.controls}`}>
+      <section className="app-card reception-toolbar">
+        <div className="reception-step"><span>1</span><h2>Selecciona al socio</h2></div>
         <form aria-label="Búsqueda de socios" className="relative flex gap-2" onSubmit={submitSearch}>
           <div className="relative min-w-0 flex-1">
             <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-[var(--brand-muted)]" />
@@ -176,8 +177,9 @@ function MemberSearch({ session }: { session: StoredSession }) {
           <button className="app-button shrink-0 sm:px-6" disabled={!query.trim() || busy} type="submit">Buscar socio</button>
         </form>
         {loading ? <p className="text-sm" role="status">Buscando socios…</p> : null}
-        {error ? <AppNotice message={error} tone="error" /> : null}
+        {error ? <AppNotice inline message={error} tone="error" /> : null}
         {clients?.length === 0 ? <p role="status" className="text-sm text-[var(--brand-muted)]">No se encontraron socios.</p> : null}
+        <div className="reception-step"><span>2</span><h2>Elige una operación</h2></div>
         <div aria-label="Operaciones disponibles" role="group" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {(Object.keys(operations) as ReceptionOperation[]).map((action) => (
             <ReceptionOperationCard
@@ -201,11 +203,10 @@ function MemberSearch({ session }: { session: StoredSession }) {
           operation={operation}
           onBusyChange={setBusy}
           onClear={() => { setSelected(null); input.current?.focus(); }}
-          onSaleRecorded={() => { setOperation(null); setRevision((value) => value + 1); }}
+          onSaleRecorded={() => setOperation(null)}
           session={session}
         />
       ) : null}
-      {session.user.permissions.includes("sale.read") ? <RecentReceptionSales session={session} revision={revision} /> : null}
     </div>
   );
 }

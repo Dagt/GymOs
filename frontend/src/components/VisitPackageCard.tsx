@@ -183,14 +183,14 @@ export function VisitPackageCard({
   const purchaseDisabled = loading || saving || refreshFailed || plans.length === 0;
   const summary = (
     <>
-      {error && !purchaseOpen ? <AppNotice message={error} tone="error" /> : null}
+      {error && !purchaseOpen ? <AppNotice inline={source === "reception"} message={error} tone="error" /> : null}
       {point.pending && canSell ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
         canReadSale={hasPermission(session, "sale.read")}
         onRetry={() => { if (point.pending) void sendPoint(point.pending).finally(onSaleRecorded); }} /> : null}
-      {message ? <AppNotice message={message} tone="success" /> : null}
+      {message ? <AppNotice inline={source === "reception"} message={message} tone="success" /> : null}
       {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando saldo...</p> : null}
       {!loading && current ? (
-        <div className="w-full rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4">
+        <div className={`${source === "reception" ? "reception-package-balance " : ""}w-full rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <strong>{current.packageName}</strong>
             <span className={current.status === "ACTIVE" ? "rounded-full bg-[#eaf6ed] px-2 py-1 text-xs font-semibold text-[#28733e]" : "rounded-full bg-[#fff3df] px-2 py-1 text-xs font-semibold text-[#8a5a22]"}>{statusLabel(current.status)}</span>
@@ -209,42 +209,51 @@ export function VisitPackageCard({
     </>
   );
 
+  const purchaseQuote = (
+    <section className="rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4 text-sm">
+      {!visibleQuote ? <p className="text-[var(--brand-muted)]">{error ? "Cotización no disponible." : "Calculando cotización..."}</p> : (
+        <div className="grid gap-2">
+          <div className="flex justify-between gap-3"><span>{visibleQuote.totalVisits} visitas · {visibleQuote.validityDays} días</span><strong>{money(visibleQuote.packagePriceCents, visibleQuote.currency)}</strong></div>
+          {visibleQuote.registrationFeeCents > 0 ? <div className="flex justify-between gap-3"><span>{visibleQuote.registrationFeeLabel ?? "Inscripción"}</span><strong>{money(visibleQuote.registrationFeeCents, visibleQuote.currency)}</strong></div> : null}
+          <div className="flex justify-between gap-3 border-t border-[var(--brand-line)] pt-2 text-base"><strong>Total</strong><strong>{money(visibleQuote.totalCents, visibleQuote.currency)}</strong></div>
+        </div>
+      )}
+    </section>
+  );
+
   const purchaseForm = (
         <form aria-label="Venta de paquete de visitas" onSubmit={submit} ref={purchaseFormRef} tabIndex={-1}>
-          <fieldset className={source === "reception" ? "grid gap-4 md:grid-cols-2" : "grid gap-4"} disabled={saving}>
-            <p className={source === "reception" ? "text-sm md:col-span-2" : "text-sm"}>Socio: <strong>{clientName}</strong></p>
-            {error ? <AppNotice message={error} tone="error" /> : null}
-            <label className="form-field" htmlFor="visitPackagePlan">
-              <span>Paquete</span>
-              <select className="app-input" id="visitPackagePlan" value={selectedPlanId} onChange={(event) => { setError(null); setQuote(null); setSelectedPlanId(event.target.value); }}>
-                {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {money(plan.priceCents, plan.currency)}</option>)}
-              </select>
-            </label>
-            <section className="rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4 text-sm">
-              {!visibleQuote ? <p className="text-[var(--brand-muted)]">{error ? "Cotización no disponible." : "Calculando cotización..."}</p> : (
-                <div className="grid gap-2">
-                  <div className="flex justify-between gap-3"><span>{visibleQuote.totalVisits} visitas · {visibleQuote.validityDays} días</span><strong>{money(visibleQuote.packagePriceCents, visibleQuote.currency)}</strong></div>
-                  {visibleQuote.registrationFeeCents > 0 ? <div className="flex justify-between gap-3"><span>{visibleQuote.registrationFeeLabel ?? "Inscripción"}</span><strong>{money(visibleQuote.registrationFeeCents, visibleQuote.currency)}</strong></div> : null}
-                  <div className="flex justify-between gap-3 border-t border-[var(--brand-line)] pt-2 text-base"><strong>Total</strong><strong>{money(visibleQuote.totalCents, visibleQuote.currency)}</strong></div>
-                </div>
-              )}
-            </section>
-            <label className="form-field" htmlFor="visitPackageMethod">
-              <span>Método de pago</span>
-              <select className="app-input" id="visitPackageMethod" value={method} onChange={(event) => { setReference(""); setMethod(event.target.value as VisitPackagePurchasePayload["method"]); }}>
-                <option value="CASH">Efectivo</option>
-                <option value="TRANSFER">Transferencia</option>
-                {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
-                {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
-              </select>
-            </label>
-            {usesReference ? (
-              <label className="form-field">
-                <span>Referencia (opcional)</span>
-                <input className="app-input" maxLength={160} value={reference} onChange={(event) => setReference(event.target.value)} />
+          <fieldset className={source === "reception" ? "reception-contract-grid" : "grid gap-4"} disabled={saving}>
+            <div className={source === "reception" ? "reception-contract-fields" : "grid gap-4"}>
+              {source === "profile" ? <p className="text-sm">Socio: <strong>{clientName}</strong></p> : <p className="reception-form-hint">Selecciona el paquete y el método de pago para crear el saldo.</p>}
+              {error ? <AppNotice inline={source === "reception"} message={error} tone="error" /> : null}
+              <label className="form-field" htmlFor="visitPackagePlan">
+                <span>Paquete</span>
+                <select className="app-input" id="visitPackagePlan" value={selectedPlanId} onChange={(event) => { setError(null); setQuote(null); setSelectedPlanId(event.target.value); }}>
+                  {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {money(plan.priceCents, plan.currency)}</option>)}
+                </select>
               </label>
-            ) : null}
-            <button className={source === "reception" ? "app-button h-11 md:col-span-2" : "app-button h-11"} disabled={saving || !visibleQuote} type="submit">{saving ? "Procesando..." : "Cobrar y crear saldo"}</button>
+              {source === "profile" ? purchaseQuote : null}
+              <label className="form-field" htmlFor="visitPackageMethod">
+                <span>Método de pago</span>
+                <select className="app-input" id="visitPackageMethod" value={method} onChange={(event) => { setReference(""); setMethod(event.target.value as VisitPackagePurchasePayload["method"]); }}>
+                  <option value="CASH">Efectivo</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
+                  {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
+                </select>
+              </label>
+              {usesReference ? (
+                <label className="form-field">
+                  <span>Referencia (opcional)</span>
+                  <input className="app-input" maxLength={160} value={reference} onChange={(event) => setReference(event.target.value)} />
+                </label>
+              ) : null}
+            </div>
+            <div className={source === "reception" ? "reception-checkout" : "grid gap-4"}>
+              {source === "reception" ? <><h3>Resumen del cobro</h3>{purchaseQuote}</> : null}
+              <button className="app-button h-11" disabled={saving || !visibleQuote} type="submit">{saving ? "Procesando..." : "Cobrar y crear saldo"}</button>
+            </div>
           </fieldset>
         </form>
       );
@@ -254,7 +263,7 @@ export function VisitPackageCard({
       {source === "reception" ? (
         <>
           {current || point.pending || loading || error || message || selected ? (
-            <section className="app-card grid gap-3 p-4">
+            <section className="app-card reception-package grid gap-3 p-4">
               {summary}
               {selected && !purchaseOpen && !loading ? <p role="status" className="text-sm">La venta requiere un socio sin paquete activo o pendiente y un catálogo disponible.</p> : null}
               {purchaseOpen ? <><h2 className="app-card-title">Vender paquete de visitas</h2>{purchaseForm}</> : null}

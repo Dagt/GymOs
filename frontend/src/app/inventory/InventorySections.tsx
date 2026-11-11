@@ -1,5 +1,7 @@
 "use client";
 
+import controls from "@/components/CommercialControls.module.css";
+
 import { type FormEvent, useState } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
 import { Pagination } from "@/components/Pagination";
@@ -342,16 +344,12 @@ export function InventoryStockPanel({
 export function InventoryMovementSummary({
   selectedStock,
   onOpenDrawer,
-  onOpenPhysicalCountDrawer,
-  onOpenTransferDrawer,
 }: {
   selectedStock: InventoryStock | null;
   onOpenDrawer: () => void;
-  onOpenPhysicalCountDrawer: () => void;
-  onOpenTransferDrawer: () => void;
 }) {
   return (
-    <section className="app-card p-5 space-y-4">
+    <section className={`app-card p-5 space-y-4 ${controls.controls}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="app-eyebrow">Producto seleccionado</p>
@@ -360,13 +358,7 @@ export function InventoryMovementSummary({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button className="app-button-secondary h-8 px-3 text-xs" onClick={onOpenPhysicalCountDrawer} type="button">
-            Conteo Físico
-          </button>
-          <button className="app-button-secondary h-8 px-3 text-xs" onClick={onOpenTransferDrawer} type="button">
-            Transferencia
-          </button>
-          <button className="app-button h-8 px-3 text-xs" disabled={!selectedStock} onClick={onOpenDrawer} type="button">
+          <button className="app-button" disabled={!selectedStock} onClick={onOpenDrawer} type="button">
             Registrar Movimiento
           </button>
         </div>
@@ -1089,9 +1081,10 @@ export function InventoryTransferDrawer({
       description="Crea una solicitud de envío de mercancía a otra sucursal de tu organización."
       onClose={onClose}
       open={open}
+      containFocus
       title="Crear Transferencia entre Sucursales"
     >
-      <div className="grid gap-4">
+      <div className={`grid gap-4 ${controls.controls}`}>
         <div className="rounded-lg border border-[var(--brand-line)] bg-[#fdfefc] p-4 grid gap-3 text-xs">
           <Field label="Sucursal Destino">
             {destinationBranches.length === 0 ? (
@@ -1114,14 +1107,15 @@ export function InventoryTransferDrawer({
             )}
           </Field>
 
-          <div className="grid sm:grid-cols-[1fr_auto_auto] gap-2 items-end">
+          <div className="grid min-w-0 gap-3">
             <div className="min-w-0">
               <InventoryProductPicker accessToken={accessToken} disabled={saving} selected={selectedStockItem} onChange={(product) => { setSelectedStockItem(product); setItemError(null); }} />
               {selectedStockItem ? <p className="mt-1 text-xs text-[var(--brand-muted)]">Disponible: {selectedStockItem.quantityOnHand} u.</p> : null}
             </div>
+            <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
             <Field label="Cantidad">
               <input
-                className="app-input w-20 text-center"
+                className="app-input text-center"
                 min={1}
                 max={selectedStockItem ? selectedStockItem.quantityOnHand : undefined}
                 value={requestedQty}
@@ -1135,6 +1129,7 @@ export function InventoryTransferDrawer({
             <button className="app-button-secondary h-10 px-3" onClick={addItem} type="button">
               Agregar
             </button>
+            </div>
           </div>
 
           {itemError ? (
@@ -1147,8 +1142,8 @@ export function InventoryTransferDrawer({
             <div className="grid gap-1 border-t border-[#e4e8df] pt-2">
               <p className="text-[10px] font-bold text-[#6f7a73] uppercase">Lista de transferencia:</p>
               {items.map((i) => (
-                <div className="flex justify-between text-xs py-1" key={i.productId}>
-                  <span className="font-semibold text-[#111815]">• {i.productName}</span>
+                <div className="flex flex-wrap justify-between gap-2 text-sm py-2" key={i.productId}>
+                  <span className="min-w-0 break-words font-semibold text-[var(--brand-ink)]">• {i.productName}</span>
                   <span className="font-bold text-[#31543d]">{i.requestedQuantity} unidades</span>
                 </div>
               ))}
