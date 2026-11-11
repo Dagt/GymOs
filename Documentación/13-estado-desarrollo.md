@@ -15,6 +15,8 @@ los reembolsos de proveedor continúan pendientes.
 
 ## Contrataciones en recepción
 
+El dashboard destaca las contrataciones. El expediente muestra el paquete vigente o pendiente y agrupa los accesos y descuentos en dos columnas cuando hay espacio.
+
 «Membresías y paquetes» centraliza la búsqueda, asignación, renovación,
 cambio de plan y venta de paquetes. Comparte la venta de paquetes con
 el expediente y actualiza el saldo tras el cobro.

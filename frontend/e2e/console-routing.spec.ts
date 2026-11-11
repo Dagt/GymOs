@@ -739,14 +739,39 @@ test.describe("consolas por rol", () => {
         return false;
       });
 
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/reception");
-    await expect(page.getByRole("link", { name: /Registrar entrada/ })).toBeVisible();
+    const checkInCard = page.getByRole("link", { name: /Acceso presencial Registrar entrada/ });
+    await expect(checkInCard).toHaveAttribute("href", "/reception/check-in");
+    await expect(checkInCard).not.toContainText("Abrir módulo");
+    await expect(page.getByRole("link", { name: /Contrataciones Membresías y paquetes/ })).toContainText("Abrir módulo");
     for (const label of ["Abrir caja", "Ver reporte", "Abrir kiosco seguro", "Ver agenda"]) {
       await expect(page.getByRole("link", { name: new RegExp(label) })).toBeVisible();
     }
     await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath("dashboard-recepcion.png") });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath("dashboard-movil.png") });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("link", { name: /Contrataciones Membresías y paquetes/ }).click();
     await expect(page.getByRole("heading", { name: "Membresías y paquetes" })).toBeVisible();
+    const preview = page.getByRole("region", { name: "Operaciones disponibles" });
+    await expect(preview.getByRole("heading", { level: 3 })).toHaveCount(4);
+    await expect(preview.getByRole("button")).toHaveCount(0);
+    expect(operations).toHaveLength(0);
+    expect(purchases).toHaveLength(0);
+    await page.screenshot({ ...screenshotOptions, path: testInfo.outputPath("membresias-sin-socio.png") });
+    await page.setViewportSize({ width: 768, height: 900 });
+    const previewColumns = () => preview.locator("article").first().evaluate(
+      (card) => getComputedStyle(card.parentElement!).gridTemplateColumns.split(" ").length,
+    );
+    expect(await previewColumns()).toBe(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(768);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await previewColumns()).toBe(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await page.screenshot({ ...screenshotOptions, fullPage: true, path: testInfo.outputPath("membresias-movil.png") });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByLabel("Nombre, teléfono o correo electrónico").fill("socio@example.invalid");
     await page.getByRole("button", { name: "Buscar socio" }).click();
     await page.getByRole("button", { name: /Socio Demo/ }).click();
@@ -796,7 +821,7 @@ test.describe("consolas por rol", () => {
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText(/Paquete activado. Venta QA-PACK/)).toBeVisible();
     await expect(page.getByText("de 5 visitas", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Vender paquete de visitas" })).toBeDisabled();
     expect(purchases).toHaveLength(2);
     expect(purchases[0]).toMatchObject({ clientId: memberId, packagePlanId: packagePlan.id, method: "TRANSFER", reference: "QA-123" });
     expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
@@ -893,6 +918,7 @@ test.describe("consolas por rol", () => {
     await page.goto("/reception");
     await expect(page.getByRole("heading", { name: /Dashboard de recepcion/ })).toBeVisible();
     await expect(page.locator('a[href="/reception/memberships"]')).toHaveCount(0);
+    await expect(page.getByText("Abrir módulo", { exact: false })).toHaveCount(0);
     await page.goto("/reception/memberships");
     await expect(page).toHaveURL(/\/reception$/);
   });

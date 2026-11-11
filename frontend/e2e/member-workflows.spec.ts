@@ -28,8 +28,9 @@ test("la lista de socios muestra plan actual y vigencia con colores tenues", asy
   await expect(expiredRow.getByText("VENCIDA", { exact: true })).toHaveClass(/bg-\[#F3D9D5\]/);
 });
 
-test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan", async ({ page }) => {
+test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan", async ({ page }, testInfo) => {
   let currentMembership = membership(currentPlanId, "Plan Base", "2026-08-20");
+  let historyRequests = 0;
   let inheritedAccess = [
     effectiveAccess("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "ACCESO_GENERAL", "Acceso General", currentPlanId, "Plan Base"),
   ];
@@ -68,6 +69,7 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
       return fulfill(route, activeSaunaPackage());
     }
     if (method === "GET" && path === `/clients/${clientId}/visit-packages`) {
+      historyRequests++;
       return fulfill(route, [activeSaunaPackage()]);
     }
     if (method === "GET" && path.startsWith("/memberships/") && path.endsWith("/periods")) {
@@ -157,6 +159,7 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
     return false;
   });
 
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/clients/${clientId}`);
 
   await expect(page.getByRole("heading", { name: "Beneficios y accesos" })).toBeVisible();
@@ -165,7 +168,28 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
   const packageAccessSection = page.getByRole("heading", { name: "Accesos del paquete activo" }).locator("..");
   await expect(packageAccessSection.getByText("Sauna", { exact: true })).toBeVisible();
   await expect(packageAccessSection.getByText(/Consume una visita del paquete/)).toBeVisible();
-  await expect(packageAccessSection.getByText("Paquete", { exact: true })).toBeVisible();
+  await expect(packageAccessSection.getByText("Paquete", { exact: true }).first()).toBeVisible();
+  const packageCard = page.getByRole("heading", { name: "Paquete de visitas", exact: true }).locator("xpath=ancestor::section[1]");
+  await expect(packageCard.getByText("de 5 visitas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Historial de paquetes" })).toHaveCount(0);
+  expect(historyRequests).toBe(0);
+
+  const cards = packageAccessSection.getByRole("article");
+  await expect(cards).toHaveCount(2);
+  const [left, right] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+  expect(left?.y).toBe(right?.y);
+  expect(left!.x).toBeLessThan(right!.x);
+  const screenshot = { animations: "disabled", style: "nextjs-portal { display: none }" } as const;
+  await packageCard.screenshot({ ...screenshot, path: testInfo.outputPath("expediente-paquete.png") });
+  const benefitsCard = page.getByRole("heading", { name: "Beneficios y accesos" }).locator("xpath=ancestor::section[1]");
+  await benefitsCard.screenshot({ ...screenshot, path: testInfo.outputPath("beneficios-dos-columnas.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const [first, second] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+  expect(first?.x).toBe(second?.x);
+  expect(first!.y).toBeLessThan(second!.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ ...screenshot, fullPage: true, path: testInfo.outputPath("expediente-movil.png") });
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   await page.getByRole("button", { name: "Cambiar plan" }).click();
   const changeDrawer = page.getByRole("dialog");
@@ -282,15 +306,16 @@ test("el marcador de renovaciones abre contrataciones y conserva los descuentos 
   });
 });
 
-test("la ficha vende el paquete con una clave válida y actualiza su historial", async ({ page }) => {
+test("la ficha vende el paquete con una clave válida y actualiza el paquete vigente", async ({ page }) => {
   const purchases: Array<Record<string, unknown>> = [];
+  let pendingPayment = false;
   const entitlement = activeSaunaPackage();
   const packagePlanId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
   await bootMemberWorkflow(page, async (route, path) => {
     if (path === `/clients/${clientId}`) {
       return fulfill(route, { client: { ...clientSummary("Socio", "Plan Base", "ACTIVE"), id: clientId }, timeline: [] });
     }
-    if (path === `/clients/${clientId}/visit-package`) return fulfill(route, purchases.length ? entitlement : null);
+    if (path === `/clients/${clientId}/visit-package`) return fulfill(route, purchases.length ? { ...entitlement, status: pendingPayment ? "PENDING_PAYMENT" : "ACTIVE" } : null);
     if (path === `/clients/${clientId}/visit-packages`) return fulfill(route, purchases.length ? [entitlement] : []);
     if (path === "/catalog/visit-package-plans") {
       return fulfill(route, [{ id: packagePlanId, name: entitlement.packageName, priceCents: 35000, currency: "MXN", status: "ACTIVE" }]);
@@ -309,10 +334,16 @@ test("la ficha vende el paquete con una clave válida y actualiza su historial",
   await page.getByRole("button", { name: "Vender paquete", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Cobrar y crear saldo" }).click();
   await expect(page.getByText("Paquete activado. Venta QA-FICHA.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Historial de paquetes" })).toBeVisible();
+  await expect(page.getByText("de 5 visitas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Historial de paquetes" })).toHaveCount(0);
   expect(purchases).toHaveLength(1);
   expect(purchases[0]).toMatchObject({ clientId, packagePlanId, method: "CASH", reference: null });
   expect(purchases[0].idempotencyKey).toMatch(/^sales:[0-9a-f-]{36}$/);
+
+  pendingPayment = true;
+  await page.reload();
+  await expect(page.getByText("Pago pendiente", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vender paquete", exact: true })).toHaveCount(0);
 });
 
 async function bootMemberWorkflow(
@@ -431,6 +462,12 @@ function activeSaunaPackage() {
       code: "SAUNA",
       name: "Sauna",
       usageMode: "CONSUMES_VISIT",
+      branchIds: [branchId],
+    }, {
+      benefitId: "21212121-2121-4121-8121-212121212121",
+      code: "REGADERAS",
+      name: "Regaderas",
+      usageMode: "INCLUDED_WITH_VISIT",
       branchIds: [branchId],
     }],
     consumptions: [],

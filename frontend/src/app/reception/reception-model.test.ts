@@ -37,3 +37,8 @@ test("reception only links to memberships and packages with commercial permissio
   assert.equal(getVisibleFocusActions(true, true, false).some((action) => action.href === href), false);
   assert.equal(getVisibleFocusActions(true, true, true).find((action) => action.href === href)?.label, "Membresías y paquetes");
 });
+
+test("only the authorized memberships shortcut is featured", () => {
+  assert.deepEqual(getVisibleFocusActions(true, true, true).filter(({ featured }) => featured).map(({ href }) => href), ["/reception/memberships"]);
+  assert.equal(getVisibleFocusActions(true, true, false).some(({ featured }) => featured), false);
+});

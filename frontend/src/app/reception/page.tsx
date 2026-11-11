@@ -145,8 +145,8 @@ export default function ReceptionPage() {
           <section>
             <h3 className="text-lg font-black text-[color:var(--brand-primary)] mb-5 px-1 uppercase tracking-widest opacity-60">Módulos Operativos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {focusActions.map((action, index) => {
-                const isPrimary = index === 0;
+              {focusActions.map((action) => {
+                const isPrimary = action.featured === true;
                 return (
                   <Link
                     key={action.href}
