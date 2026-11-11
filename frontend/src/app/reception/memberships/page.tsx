@@ -7,6 +7,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { getStoredSession, searchClients, type ClientSummary, type StoredSession } from "@/lib/api";
 import { contractErrorMessage } from "@/lib/contract-error";
 import { canAccessRoute } from "@/lib/role-model";
+import { membershipOperations, packageOperation, ReceptionOperationCard } from "@/components/ReceptionOperationCard";
 import { ReceptionMemberOperations } from "./ReceptionMemberOperations";
 
 export default function ReceptionMembershipsPage() {
@@ -70,7 +71,7 @@ function MemberSearch({ session }: { session: StoredSession }) {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-5xl gap-4">
+    <div className="mx-auto grid w-full max-w-6xl gap-4">
       <section className="app-card grid gap-3 p-5">
         <h2 className="app-card-title">Buscar socio</h2>
         <form className="flex flex-col gap-2 sm:flex-row" onSubmit={search}>
@@ -113,7 +114,17 @@ function MemberSearch({ session }: { session: StoredSession }) {
           onClear={() => setSelected(null)}
           session={session}
         />
-      ) : null}
+      ) : (
+        <section aria-labelledby="reception-operations">
+          <h2 className="app-card-title" id="reception-operations">Operaciones disponibles</h2>
+          <p className="mb-3 mt-1 text-sm text-[var(--brand-muted)]">Busca y selecciona un socio para iniciar una operación.</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[...Object.values(membershipOperations), packageOperation].map((operation) => (
+              <ReceptionOperationCard key={operation.title} {...operation} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

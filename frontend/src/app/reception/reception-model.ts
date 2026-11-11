@@ -4,6 +4,7 @@ export type FocusAction = {
   href: string;
   label: string;
   accent: string;
+  featured?: boolean;
 };
 
 export const FOCUS_ACTIONS: FocusAction[] = [
@@ -69,24 +70,23 @@ export function getFocusActions(): FocusAction[] {
 
 export function getVisibleFocusActions(canLaunchKiosk: boolean, canCheckIn: boolean, canManageMemberships = false): FocusAction[] {
   const actions = FOCUS_ACTIONS.filter((action) => action.href !== "/kiosk/launch" || canLaunchKiosk);
-  if (canManageMemberships) actions.splice(1, 0, {
+  if (canManageMemberships) actions.unshift({
     title: "Contrataciones",
-    detail: "Asigna y renueva membresías, cambia planes y vende paquetes de visitas.",
+    detail: "Asigna, renueva o cambia membresías y vende paquetes de visitas desde un solo lugar.",
     href: "/reception/memberships",
     label: "Membresías y paquetes",
+    featured: true,
     accent: "people",
   });
   if (!canCheckIn) return actions;
-  return [
-    {
-      title: "Acceso presencial",
-      detail: "Consulta la membresía, los beneficios y el saldo antes de registrar una entrada.",
-      href: "/reception/check-in",
-      label: "Registrar entrada",
-      accent: "people",
-    },
-    ...actions,
-  ];
+  actions.splice(canManageMemberships ? 1 : 0, 0, {
+    title: "Acceso presencial",
+    detail: "Consulta la membresía, los beneficios y el saldo antes de registrar una entrada.",
+    href: "/reception/check-in",
+    label: "Registrar entrada",
+    accent: "people",
+  });
+  return actions;
 }
 
 export function getQuickActions(): { primary: FocusAction; secondary: FocusAction[] } {

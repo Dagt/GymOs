@@ -37,6 +37,8 @@ aceptaba texto arbitrario. Se añadió una lista de métodos permitidos y una
 regresión HTTP/PostgreSQL que comprueba el rechazo antes de persistir la venta.
 La aceptación de Point con terminal conectada sigue pendiente.
 
+La vista operativa del expediente omite la consulta de historial de paquetes. El contrato histórico sigue disponible para sus consumidores administrativos.
+
 ## 2. Deuda activa
 
 | ID | Pri. | Módulo | Estado | Hallazgo e impacto | Criterio de cierre |

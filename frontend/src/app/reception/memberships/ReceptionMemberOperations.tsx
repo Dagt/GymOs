@@ -5,6 +5,7 @@ import { AppNotice } from "@/components/AppNotice";
 import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import { ReceptionPointRecovery, useReceptionPoint } from "@/components/ReceptionPointRecovery";
 import { runSaleWrite } from "@/lib/sale-write";
+import { membershipOperations, ReceptionOperationCard } from "@/components/ReceptionOperationCard";
 import { VisitPackageCard } from "@/components/VisitPackageCard";
 import { currentMembership } from "@/app/clients/[clientId]/client-membership-helpers";
 import { resolveClientMembershipCapabilities } from "@/app/clients/[clientId]/client-membership-permissions";
@@ -25,13 +26,8 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
-const operationLabels = {
-  enroll: "Asignar membresía",
-  renew: "Renovar membresía",
-  change: "Cambiar plan",
-};
 const clientStatus = { ACTIVE: "Activo", INACTIVE: "Inactivo", SUSPENDED: "Suspendido" };
-type Operation = keyof typeof operationLabels;
+type Operation = keyof typeof membershipOperations;
 type PaymentMethod = RenewMembershipPayload["method"];
 
 export function ReceptionMemberOperations({ client, session, onBusyChange, onClear }: {
@@ -61,6 +57,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const inFlight = useRef(false);
+  const operationForm = useRef<HTMLFormElement>(null);
   const targetPlanId = operation === "renew" ? membership?.planId : selectedPlanId;
   const visibleQuote = quote?.planId === targetPlanId ? quote : null;
   const eligiblePlans = plans.filter((plan) => operation !== "change" || plan.id !== membership?.planId);
@@ -98,6 +95,10 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
     return () => { active = false; };
   }, [token, client.id, operation, targetPlanId]);
 
+  useEffect(() => {
+    if (operation) operationForm.current?.focus();
+  }, [operation]);
+
   function selectOperation(next: Operation | null) {
     setOperation(next);
     setSelectedPlanId("");
@@ -120,7 +121,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
         method,
         reference: paymentReference,
         validateNow: method !== "CARD_MERCADO_PAGO",
-        notes: `${operationLabels[operation]} desde recepción`,
+        notes: `${membershipOperations[operation].title} desde recepción`,
       };
       const write = (idempotencyKey: string) => operation === "enroll"
         ? enrollMembership(token, { ...payment, idempotencyKey, clientId: client.id, planId: targetPlanId })
@@ -183,7 +184,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
   }
 
   return (
-    <>
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
       <section className="app-card grid gap-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -207,24 +208,25 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
         {point.pending && capabilities.canEnroll ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
           canReadSale={session.user.permissions.includes("sale.read")}
           onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
-        {capabilities.canManage ? (
-          <div className="flex flex-wrap gap-2" aria-label="Operaciones de membresía">
-            {(Object.keys(operationLabels) as Operation[]).map((action) => (
-              <button
-                aria-pressed={operation === action}
-                className={operation === action ? "app-button" : "app-button-secondary disabled:cursor-not-allowed disabled:opacity-50"}
-                disabled={processing || operation === action || !actionAllowed(action)}
-                key={action}
-                onClick={() => selectOperation(action)}
-                type="button"
-              >{operationLabels[action]}</button>
-            ))}
-          </div>
-        ) : null}
+      </section>
+      <section className="grid min-w-0 gap-3" aria-labelledby="selected-operations">
+        <h2 className="app-card-title" id="selected-operations">Operaciones disponibles</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(Object.keys(membershipOperations) as Operation[]).map((action) => (
+            <ReceptionOperationCard
+              key={action}
+              {...membershipOperations[action]}
+              selected={operation === action}
+              disabled={processing || !actionAllowed(action)}
+              onSelect={() => selectOperation(action)}
+            />
+          ))}
+          <VisitPackageCard clientId={client.id} clientName={clientName} session={session} source="reception" />
+        </div>
         {operation ? (
-          <form onSubmit={submit}>
+          <form className="app-card p-4" onSubmit={submit} ref={operationForm} tabIndex={-1}>
             <fieldset className="grid gap-3 rounded-lg border border-[var(--brand-line)] p-4" disabled={processing}>
-              <legend className="px-1 font-semibold">{operationLabels[operation]}</legend>
+              <legend className="px-1 font-semibold">{membershipOperations[operation].title}</legend>
               {operation !== "renew" ? (
                 <label className="form-field">
                   <span>Plan</span>
@@ -270,7 +272,6 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
           </form>
         ) : null}
       </section>
-      <VisitPackageCard clientId={client.id} clientName={clientName} session={session} source="reception" />
-    </>
+    </div>
   );
 }

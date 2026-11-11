@@ -198,7 +198,7 @@ export function ClientBenefitsSection({
   }
 
   return (
-    <section className="app-card p-5">
+    <section className="app-card @container p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="app-eyebrow">Elegibilidad vigente</p>
@@ -228,7 +228,7 @@ export function ClientBenefitsSection({
         <div className="mt-5 grid gap-5">
           <section>
             <h3 className="text-sm font-semibold text-[#26352e]">Accesos heredados del plan activo</h3>
-            <div className="mt-2 grid gap-2">
+            <div className="mt-2 grid gap-2 @min-[26rem]:grid-cols-2 [&>p]:col-span-full">
               {!session.user.branchId ? (
                 <EmptyBenefitState text="Selecciona una sucursal para calcular los accesos efectivos." />
               ) : !canReadAccessBenefits ? (
@@ -238,7 +238,7 @@ export function ClientBenefitsSection({
               ) : (
                 accessBenefits.map((benefit) => (
                   <article
-                    className="rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] p-3"
+                    className="min-w-0 wrap-anywhere rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] p-3"
                     key={benefit.benefitId}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -260,7 +260,7 @@ export function ClientBenefitsSection({
 
           <section>
             <h3 className="text-sm font-semibold text-[#26352e]">Accesos del paquete activo</h3>
-            <div className="mt-2 grid gap-2">
+            <div className="mt-2 grid gap-2 @min-[26rem]:grid-cols-2 [&>p]:col-span-full">
               {!session.user.branchId ? (
                 <EmptyBenefitState text="Selecciona una sucursal para consultar los accesos del paquete." />
               ) : !canReadAccessBenefits ? (
@@ -270,14 +270,14 @@ export function ClientBenefitsSection({
               ) : (
                 packageAccessBenefits.map((benefit) => (
                   <article
-                    className="rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] p-3"
+                    className="min-w-0 wrap-anywhere rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] p-3"
                     key={benefit.benefitId}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <strong className="text-sm text-[#26352e]">{benefit.name}</strong>
                         <p className="mt-1 text-xs text-[#5d6b63]">
-                          {benefit.usageMode === "CONSUMES_VISIT"
+                          Código {benefit.code} · {benefit.usageMode === "CONSUMES_VISIT"
                             ? "Consume una visita del paquete al autorizar este acceso."
                             : "Se habilita después de registrar una visita del paquete ese día en esta sucursal."}
                         </p>
@@ -294,7 +294,7 @@ export function ClientBenefitsSection({
 
           <section>
             <h3 className="text-sm font-semibold text-[#26352e]">Descuentos asignados al socio</h3>
-            <div className="mt-2 grid gap-2">
+            <div className="mt-2 grid gap-2 @min-[26rem]:grid-cols-2 [&>p]:col-span-full">
               {clientBenefits.length === 0 ? (
                 <EmptyBenefitState text="El socio no tiene descuentos o convenios asignados." />
               ) : (
@@ -311,13 +311,14 @@ export function ClientBenefitsSection({
                     && benefit.status.toUpperCase() === "ASSIGNED";
                   return (
                     <article
-                      className="rounded-lg border border-[#d8ddd2] bg-white p-3"
+                      className="min-w-0 wrap-anywhere rounded-lg border border-[#d8ddd2] bg-white p-3"
                       key={benefit.id}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <strong className="text-sm text-[#26352e]">{benefit.benefitName}</strong>
                           <p className="mt-1 text-xs text-[#5d6b63]">
+                            {definition?.code ? `Código ${definition.code} · ` : ""}
                             {benefit.validUntil
                               ? `Vigencia hasta ${benefit.validUntil}`
                               : "Sin fecha de expiración registrada"}

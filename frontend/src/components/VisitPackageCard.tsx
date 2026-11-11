@@ -4,12 +4,12 @@ import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ReceptionPointRecovery, useReceptionPoint } from "@/components/ReceptionPointRecovery";
 import { runSaleWrite } from "@/lib/sale-write";
+import { packageOperation, ReceptionOperationCard } from "@/components/ReceptionOperationCard";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppNotice } from "@/components/AppNotice";
 import { contractErrorMessage } from "@/lib/contract-error";
 import {
   getCurrentVisitPackage,
-  getVisitPackageHistory,
   getPaymentConfiguration,
   getVisitPackagePlans,
   purchaseVisitPackage,
@@ -35,7 +35,6 @@ export function VisitPackageCard({
   const point = useReceptionPoint(session, clientId, "package");
   const [plans, setPlans] = useState<VisitPackagePlanSummary[]>([]);
   const [current, setCurrent] = useState<VisitPackageEntitlement | null>(null);
-  const [history, setHistory] = useState<VisitPackageEntitlement[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [quote, setQuote] = useState<VisitPackageQuote | null>(null);
   const [method, setMethod] = useState<VisitPackagePurchasePayload["method"]>("CASH");
@@ -58,17 +57,15 @@ export function VisitPackageCard({
     async function load() {
       setLoading(true);
       try {
-        const [loadedPlans, entitlement, packageHistory] = await Promise.all([
+        const [loadedPlans, entitlement] = await Promise.all([
           canSell ? getVisitPackagePlans(session.accessToken) : Promise.resolve([]),
           getCurrentVisitPackage(session.accessToken, clientId),
-          source === "profile" ? getVisitPackageHistory(session.accessToken, clientId) : Promise.resolve([]),
         ]);
         if (!active) return;
         const activePlans = loadedPlans.filter((plan) => plan.status === "ACTIVE");
         setPlans(activePlans);
         setSelectedPlanId((value) => value || activePlans[0]?.id || "");
         setCurrent(entitlement);
-        setHistory(packageHistory);
         if (canSell && (hasPermission(session, "payment.settings.read") || hasPermission(session, "payment.settings.manage"))) {
           const payment = await getPaymentConfiguration(session.accessToken);
           if (!active) return;
@@ -83,7 +80,7 @@ export function VisitPackageCard({
     }
     void load();
     return () => { active = false; };
-  }, [canSell, clientId, session, source]);
+  }, [canSell, clientId, session]);
 
   useEffect(() => {
     if (!open || !selectedPlanId || current) return;
@@ -141,7 +138,6 @@ export function VisitPackageCard({
   async function refreshPackage() {
     try {
       setCurrent(await getCurrentVisitPackage(session.accessToken, clientId));
-      if (source === "profile") setHistory(await getVisitPackageHistory(session.accessToken, clientId));
       setRefreshFailed(false);
     } catch (exception) {
       setRefreshFailed(true);
@@ -161,70 +157,56 @@ export function VisitPackageCard({
     }
   }
 
+  const canOpenPurchase = canSell && !current && !point.pending;
+  const purchaseDisabled = loading || saving || refreshFailed || plans.length === 0;
+  const summary = (
+    <>
+      {error && !open ? <AppNotice message={error} tone="error" /> : null}
+      {point.pending && canSell ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
+        canReadSale={hasPermission(session, "sale.read")}
+        onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
+      {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando saldo...</p> : null}
+      {!loading && current ? (
+        <div className="w-full rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong>{current.packageName}</strong>
+            <span className={current.status === "ACTIVE" ? "rounded-full bg-[#eaf6ed] px-2 py-1 text-xs font-semibold text-[#28733e]" : "rounded-full bg-[#fff3df] px-2 py-1 text-xs font-semibold text-[#8a5a22]"}>{statusLabel(current.status)}</span>
+          </div>
+          {current.status === "ACTIVE" ? (
+            <p className="mt-2 text-2xl font-semibold text-[var(--brand-primary)]">{current.remainingVisits} <span className="text-sm font-normal text-[var(--brand-muted)]">de {current.totalVisits} visitas</span></p>
+          ) : <p className="mt-2 text-sm text-[var(--brand-muted)]">El pago está pendiente; no consume visitas todavía.</p>}
+          {current.status === "PENDING_PAYMENT" && !point.pending && hasPermission(session, "sale.read") ? (
+            <Link className="mt-2 inline-block text-sm underline" href={`/sales/${current.saleId}`}>Consultar venta</Link>
+          ) : null}
+          {current.validUntil ? <p className="mt-1 text-xs text-[var(--brand-muted)]">Vigente hasta {formatDate(current.validUntil)}.</p> : null}
+        </div>
+      ) : null}
+      {!loading && !refreshFailed && !current ? <p className="text-sm text-[var(--brand-muted)]">El socio no tiene un paquete pendiente ni activo.</p> : null}
+      {!loading && !current && canSell && plans.length === 0 ? <p className="text-xs text-[#8a5a22]">No hay paquetes activos disponibles en esta sucursal.</p> : null}
+    </>
+  );
+
   return (
     <>
-      <section className="app-card grid gap-4 p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="app-eyebrow">Accesos consumibles</p>
-            <h2 className="app-card-title">Paquete de visitas</h2>
-          </div>
-          {canSell && !current && !point.pending ? <button className="app-button h-9" disabled={loading || saving || refreshFailed || plans.length === 0} type="button" onClick={beginPurchase}>{source === "reception" ? "Vender paquete de visitas" : "Vender paquete"}</button> : null}
-        </div>
-        {error && !open ? <AppNotice message={error} tone="error" /> : null}
-        {point.pending && canSell ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
-          canReadSale={hasPermission(session, "sale.read")}
-          onRetry={() => { if (point.pending) void sendPoint(point.pending); }} /> : null}
-        {message ? <AppNotice message={message} tone="success" /> : null}
-        {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando saldo...</p> : null}
-        {!loading && current ? (
-          <div className="rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <strong>{current.packageName}</strong>
-              <span className={current.status === "ACTIVE" ? "rounded-full bg-[#eaf6ed] px-2 py-1 text-xs font-semibold text-[#28733e]" : "rounded-full bg-[#fff3df] px-2 py-1 text-xs font-semibold text-[#8a5a22]"}>{statusLabel(current.status)}</span>
+      {source === "reception" ? (
+        <ReceptionOperationCard {...packageOperation} disabled={!canOpenPurchase || purchaseDisabled} onSelect={beginPurchase}>
+          {summary}
+        </ReceptionOperationCard>
+      ) : (
+        <section className="app-card grid gap-4 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="app-eyebrow">Accesos consumibles</p>
+              <h2 className="app-card-title">Paquete de visitas</h2>
             </div>
-            {current.status === "ACTIVE" ? (
-              <p className="mt-2 text-2xl font-semibold text-[var(--brand-primary)]">{current.remainingVisits} <span className="text-sm font-normal text-[var(--brand-muted)]">de {current.totalVisits} visitas</span></p>
-            ) : <p className="mt-2 text-sm text-[var(--brand-muted)]">El pago está pendiente; no consume visitas todavía.</p>}
-            {current.status === "PENDING_PAYMENT" && !point.pending && hasPermission(session, "sale.read") ? (
-              <Link className="mt-2 inline-block text-sm underline" href={`/sales/${current.saleId}`}>Consultar venta</Link>
+            {canOpenPurchase ? (
+              <button className="app-button h-9" disabled={purchaseDisabled} type="button" onClick={beginPurchase}>Vender paquete</button>
             ) : null}
-            {current.validUntil ? <p className="mt-1 text-xs text-[var(--brand-muted)]">Vigente hasta {formatDate(current.validUntil)}.</p> : null}
           </div>
-        ) : null}
-        {!loading && !refreshFailed && !current ? <p className="text-sm text-[var(--brand-muted)]">El socio no tiene un paquete pendiente ni activo.</p> : null}
-        {!loading && !current && canSell && plans.length === 0 ? <p className="text-xs text-[#8a5a22]">No hay paquetes activos disponibles en esta sucursal.</p> : null}
-        {!loading && history.length > 0 ? (
-          <section className="grid gap-2 border-t border-[var(--brand-line)] pt-4">
-            <h3 className="text-sm font-semibold text-[#111815]">Historial de paquetes</h3>
-            {history.map((entitlement) => (
-              <article className="rounded-lg border border-[var(--brand-line)] bg-white p-3" key={entitlement.id}>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <strong>{entitlement.packageName}</strong>
-                  <span className="text-xs text-[var(--brand-muted)]">{statusLabel(entitlement.status)}</span>
-                </div>
-                <p className="mt-1 text-xs text-[var(--brand-muted)]">
-                  {entitlement.remainingVisits} de {entitlement.totalVisits} visitas
-                  {entitlement.validFrom ? ` · ${formatDate(entitlement.validFrom)}` : ""}
-                  {entitlement.validUntil ? ` a ${formatDate(entitlement.validUntil)}` : ""}
-                </p>
-                {entitlement.consumptions.length > 0 ? (
-                  <div className="mt-2 grid gap-1 border-t border-[var(--brand-line)] pt-2">
-                    {entitlement.consumptions.slice(0, 5).map((consumption) => (
-                      <p className="text-xs text-[var(--brand-muted)]" key={consumption.id}>
-                        {formatDateTime(consumption.occurredAt)} · {consumption.branchName}
-                        {consumption.deviceName ? ` · ${consumption.deviceName}` : ""}
-                        {` · saldo ${consumption.remainingAfter}`}
-                        {consumption.status === "REVERSED" ? " · revertido" : ""}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </section>
-        ) : null}
-      </section>
+          {summary}
+        </section>
+      )}
 
       <AppDrawer onClose={() => { if (!inFlight.current) setOpen(false); }} open={open} title="Vender paquete de visitas">
         <form onSubmit={submit}>
@@ -281,10 +263,6 @@ function statusLabel(status: VisitPackageEntitlement["status"]) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function money(cents: number, currency: string) {
