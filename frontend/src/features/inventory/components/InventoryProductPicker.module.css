@@ -1,0 +1,5 @@
+.picker { width: 100%; min-width: 0; }
+.picker .trigger { height: auto; min-height: 44px; padding: 12px; text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.picker .results { max-height: 18rem; overflow-y: auto; overscroll-behavior: contain; min-width: 0; }
+.results button { overflow-wrap: anywhere; }
+.results button[aria-pressed="true"] { background: var(--brand-accent-soft); }

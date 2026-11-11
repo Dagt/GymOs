@@ -183,11 +183,11 @@ export function VisitPackageCard({
   const purchaseDisabled = loading || saving || refreshFailed || plans.length === 0;
   const summary = (
     <>
-      {error && !purchaseOpen ? <AppNotice message={error} tone="error" /> : null}
+      {error && !purchaseOpen ? <AppNotice inline={source === "reception"} message={error} tone="error" /> : null}
       {point.pending && canSell ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
         canReadSale={hasPermission(session, "sale.read")}
         onRetry={() => { if (point.pending) void sendPoint(point.pending).finally(onSaleRecorded); }} /> : null}
-      {message ? <AppNotice message={message} tone="success" /> : null}
+      {message ? <AppNotice inline={source === "reception"} message={message} tone="success" /> : null}
       {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando saldo...</p> : null}
       {!loading && current ? (
         <div className={`${source === "reception" ? "reception-package-balance " : ""}w-full rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4`}>
@@ -226,7 +226,7 @@ export function VisitPackageCard({
           <fieldset className={source === "reception" ? "reception-contract-grid" : "grid gap-4"} disabled={saving}>
             <div className={source === "reception" ? "reception-contract-fields" : "grid gap-4"}>
               {source === "profile" ? <p className="text-sm">Socio: <strong>{clientName}</strong></p> : <p className="reception-form-hint">Selecciona el paquete y el método de pago para crear el saldo.</p>}
-              {error ? <AppNotice message={error} tone="error" /> : null}
+              {error ? <AppNotice inline={source === "reception"} message={error} tone="error" /> : null}
               <label className="form-field" htmlFor="visitPackagePlan">
                 <span>Paquete</span>
                 <select className="app-input" id="visitPackagePlan" value={selectedPlanId} onChange={(event) => { setError(null); setQuote(null); setSelectedPlanId(event.target.value); }}>

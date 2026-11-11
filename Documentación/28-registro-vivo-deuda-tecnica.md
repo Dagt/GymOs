@@ -169,3 +169,7 @@ Point mantiene pendientes las órdenes que carecen de moneda o importe pagado ve
 ## Seguimiento visual de recepción — 10/11/2026
 
 Se corrige la composición dispareja de membresías y el fondo secundario heredado de CSS global mediante estilos acotados. Falta aceptación visual del usuario; no cierra los gates conectados de SAL-001. [Verificación](../docs/testing/reception-memberships-polish.md).
+
+## Consistencia visual acotada (PR #74)
+
+Corregidos ancho del selector de transferencias y alineación de filtros del catálogo. Se mantienen cambios locales; la cascada global de globals.css con múltiples overrides y el foco de otros drawers requieren una tarea independiente, no un rediseño global en esta entrega.

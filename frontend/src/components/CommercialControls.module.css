@@ -1,0 +1,26 @@
+/* Opt-in commercial controls: existing GymFort tokens and control dimensions. */
+.controls :global(.app-button), .controls :global(.app-button-secondary) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: .55rem !important;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: none !important;
+}
+.controls :global(.app-button) {
+  background: var(--brand-action, var(--brand-primary)) !important;
+  border: 1px solid var(--brand-primary) !important;
+  color: white !important;
+}
+.controls :global(.app-button-secondary) {
+  background: white !important;
+  border: 1px solid var(--brand-line) !important;
+  color: var(--brand-primary) !important;
+}
+.controls :global(.app-button:hover:not(:disabled)) { background: var(--brand-primary) !important; }
+.controls :global(.app-button-secondary:hover:not(:disabled)) { background: var(--brand-surface) !important; }
+.controls button:disabled { opacity: .5; cursor: not-allowed; }
+.controls button:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }

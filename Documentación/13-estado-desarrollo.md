@@ -354,3 +354,7 @@ La corrección SAL-001 rechaza órdenes Point sin evidencia de moneda o importe 
 ## Pulido de membresías — 10/11/2026
 
 Rama `codex/reception-memberships-visual-polish`, base main `36b50d545eb3def2871b3c2211872f5329373b04` tras merge #73. Presentación de recepción con evidencia de escritorio, tablet y móvil; entrega sin merge ni despliegue. [Resultados locales y límites](../docs/testing/reception-memberships-polish.md).
+
+## Continuación UX del PR #74
+
+Sobre codex/reception-memberships-visual-polish, SHA inicial e534bdc809487fce23ca1424168be6c1c67e03f0. Se integra inventario, transferencias, filtros y retiro de actividad reciente de membresías sin sustituir el trabajo previo. SHA final, comandos y capturas en el PR y [verificación](../docs/testing/ux-commercial-consistency.md). Sin merge.

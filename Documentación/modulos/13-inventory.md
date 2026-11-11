@@ -47,3 +47,7 @@ Contrato y límites: [paginación de listados](../../docs/operations/list-pagina
 ## SAL-001
 
 Point reserva unidades por venta y sede bajo el bloqueo del stock, sin alterar el saldo físico. La venta pagada consume la reserva y escribe el movimiento. Los demás egresos respetan esas unidades.
+
+## UX de inventario y transferencias (PR #74)
+
+El panel seleccionado conserva únicamente Registrar Movimiento. Conteos y transferencias siguen en sus pestañas. El selector compartido permite nombres largos, desplazamiento interno y teclado; transferencias separa producto de cantidad/agregar y contiene el foco. Sin cambios de stock, costos ni solicitudes.

@@ -188,3 +188,7 @@ La habilitación piloto de Point requiere verificar moneda e importe pagado en l
 ## Recepción: composición de membresías — 10/11/2026
 
 Pulido incremental de acciones, resumen y formulario bajo UX #26, con [capturas y pruebas locales](../docs/testing/reception-memberships-polish.md). La aceptación visual del usuario y los gates conectados siguen pendientes.
+
+## UX comercial (PR #74)
+
+Correcciones acotadas de inventario, selector de transferencias, filtros del catálogo y membresías. POS, socios y reservas sirven como referencia; la normalización global queda fuera de esta entrega. [Evidencia](../docs/testing/ux-commercial-consistency.md).

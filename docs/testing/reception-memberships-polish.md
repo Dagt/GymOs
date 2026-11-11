@@ -1,3 +1,5 @@
+> Continuado y actualizado por [UX comercial del PR #74](ux-commercial-consistency.md): actividad reciente retirada y capturas reemplazadas. Las verificaciones de este informe describen el corte inicial e534bdc8.
+
 # Pulido de membresías de recepción — 10/11/2026
 
 Base: `36b50d545eb3def2871b3c2211872f5329373b04` (main, PR #73 integrado).

@@ -10,11 +10,13 @@ export function AppNotice({
   onClose,
   title,
   tone,
+  inline = false,
 }: {
   message: string;
   onClose?: () => void;
   title?: string;
   tone: AppNoticeTone;
+  inline?: boolean;
 }) {
   const [dismissedMessage, setDismissedMessage] = useState<string | null>(null);
   const region = typeof document === "undefined" ? null : document.getElementById("app-notice-region");
@@ -25,7 +27,7 @@ export function AppNotice({
     return () => window.clearTimeout(timeout);
   }, [message, tone]);
 
-  if (dismissedMessage === message || !region) return null;
+  if (dismissedMessage === message || (!inline && !region)) return null;
 
   const resolvedTitle = title ?? ({
     error: "No pudimos completar la acción",
@@ -38,7 +40,7 @@ export function AppNotice({
     onClose?.();
   }
 
-  return createPortal(
+  const notice = (
     <aside
       aria-live={tone === "error" ? "assertive" : "polite"}
       className={`app-notice app-notice-${tone}`}
@@ -52,7 +54,7 @@ export function AppNotice({
         <p>{message}</p>
       </div>
       <button aria-label="Cerrar mensaje" onClick={close} type="button">×</button>
-    </aside>,
-    region,
+    </aside>
   );
+  return inline ? notice : createPortal(notice, region!);
 }

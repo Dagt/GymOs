@@ -140,3 +140,7 @@ y registra la corrección operativa. Ver [Access](10-access.md).
 ## Pulido de recepción — 10/11/2026
 
 La pantalla usa acciones centradas, resumen compacto y cobro con total destacado en un panel lateral adaptable. Cotizaciones, permisos y recuperación de Point conservan sus contratos. [Evidencia y límites](../../docs/testing/reception-memberships-polish.md).
+
+## Recepción enfocada en contratación (PR #74)
+
+Se retira Operaciones recientes y su consulta exclusiva de ventas. Permanecen ambos órdenes de selección y los cuatro contratos. La selección usa acento de marca e icono de confirmación; avisos locales evitan tapar la confirmación al reintentar.

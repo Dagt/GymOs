@@ -209,8 +209,8 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
             </>
           ) : <p>{membership === null ? "El socio no tiene membresía." : "Membresía no disponible."}</p>}
         </div>
-        {message ? <AppNotice message={message} tone="success" /> : null}
-        {error ? <AppNotice message={error} tone="error" /> : null}
+        {message ? <AppNotice inline message={message} tone="success" /> : null}
+        {error ? <AppNotice inline message={error} tone="error" /> : null}
         {point.pending && capabilities.canEnroll ? <ReceptionPointRecovery sale={point.pending} sending={point.sending}
           canReadSale={session.user.permissions.includes("sale.read")}
           onRetry={() => { if (point.pending) void sendPoint(point.pending).finally(onSaleRecorded); }} /> : null}
@@ -244,7 +244,7 @@ export function ReceptionMemberOperations({ client, session, onBusyChange, onCle
                   </label>
                 ) : <p className="font-semibold">{membership?.planName}</p>}
                 {durationDays ? <p className="text-sm">Vigencia del plan: {durationDays} días</p> : null}
-                {quoteError ? <AppNotice message={quoteError} tone="error" /> : null}
+                {quoteError ? <AppNotice inline message={quoteError} tone="error" /> : null}
                 <div className={usesReference ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
                   <label className="form-field">
                     <span>Método de pago</span>

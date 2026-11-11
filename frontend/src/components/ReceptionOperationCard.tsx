@@ -1,4 +1,4 @@
-import { ArrowRightLeft, RefreshCw, Ticket, UserPlus } from "lucide-react";
+import { ArrowRightLeft, RefreshCw, Ticket, UserPlus, Check } from "lucide-react";
 
 export const membershipOperations = {
   enroll: { icon: UserPlus, title: "Asignar membresía" },
@@ -33,6 +33,7 @@ export function ReceptionOperationCard({ operation, selected, disabled, onSelect
     >
       <Icon aria-hidden="true" className="size-5 shrink-0" />
       <span>{title}</span>
+      {selected ? <Check aria-hidden="true" className="size-4 shrink-0" /> : null}
     </button>
   );
 }
