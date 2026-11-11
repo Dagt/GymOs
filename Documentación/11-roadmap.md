@@ -26,7 +26,7 @@ Este documento expresa secuencia y estado, no sustituye el estado verificable de
 ### Operación del gimnasio
 
 - CRM de socios, importación, catálogo, POS, caja y reportes operativos.
-- Membresías con periodos inclusivos, alta, renovación, cambio y beneficios. Recepción concentra esas operaciones y la venta de paquetes en una pantalla dedicada que presenta las operaciones antes de seleccionar al socio.
+- Membresías con periodos inclusivos, alta, renovación, cambio y beneficios. Recepción concentra esas operaciones y la venta de paquetes en una pantalla dedicada que permite elegir la operación antes o después de buscar al socio y consultar las ventas recientes autorizadas.
 - Acceso lógico, dispositivos, bitácora, autorizaciones temporales y beneficios
   `ACCESS`; control plane/Connector API durables implementados y apertura física
   aún simulada.

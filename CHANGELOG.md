@@ -12,6 +12,8 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- «Membresías y paquetes» permite elegir primero la operación o el socio, buscar con debounce y consultar las contrataciones recientes de la sucursal mediante el listado de ventas existente.
+
 - La recuperación de Checkout verifica el estado actual en Stripe antes de
   redirigir o crear otro intento. Conserva el pago original y reserva los
   reemplazos de forma idempotente en PostgreSQL.

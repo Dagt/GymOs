@@ -1,45 +1,38 @@
 import { ArrowRightLeft, RefreshCw, Ticket, UserPlus } from "lucide-react";
-import type { ReactNode } from "react";
 
 export const membershipOperations = {
-  enroll: { icon: UserPlus, title: "Asignar membresía", description: "Contrata un plan para un socio y registra su pago." },
-  renew: { icon: RefreshCw, title: "Renovar membresía", description: "Extiende la vigencia de una membresía existente." },
-  change: { icon: ArrowRightLeft, title: "Cambiar plan", description: "Consulta las opciones disponibles y cambia el plan del socio." },
+  enroll: { icon: UserPlus, title: "Asignar membresía" },
+  renew: { icon: RefreshCw, title: "Renovar membresía" },
+  change: { icon: ArrowRightLeft, title: "Cambiar plan" },
 };
 
-export const packageOperation = {
-  icon: Ticket,
-  title: "Vender paquete de visitas",
-  description: "Contrata paquetes de accesos consumibles y registra el pago.",
+export const operations = {
+  ...membershipOperations,
+  package: { icon: Ticket, title: "Vender paquete de visitas" },
 };
 
-export function ReceptionOperationCard({ title, description, icon: Icon, selected, disabled, onSelect, children }: {
-  title: string;
-  description: string;
-  icon: typeof Ticket;
-  selected?: boolean;
-  disabled?: boolean;
-  onSelect?: () => void;
-  children?: ReactNode;
+export type ReceptionOperation = keyof typeof operations;
+
+export function ReceptionOperationCard({ operation, selected, disabled, onSelect }: {
+  operation: ReceptionOperation;
+  selected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
 }) {
+  const { icon: Icon, title } = operations[operation];
   return (
-    <article className={`app-card flex min-w-0 flex-col items-start gap-2 p-4 ${selected ? "ring-2 ring-[var(--brand-primary)]" : ""}`}>
-      <Icon aria-hidden="true" className="size-5 text-[var(--brand-primary)]" />
-      <h3 className="text-sm font-semibold text-[var(--brand-ink)]">{title}</h3>
-      <p className="text-sm text-[var(--brand-muted)]">{description}</p>
-      {children}
-      {onSelect ? (
-        <button
-          aria-label={title}
-          aria-pressed={selected}
-          className="app-button-secondary mt-auto disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={disabled || selected}
-          onClick={onSelect}
-          type="button"
-        >
-          {selected ? "Seleccionada" : disabled ? "No disponible" : "Seleccionar"}
-        </button>
-      ) : null}
-    </article>
+    <button
+      aria-pressed={selected}
+      className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${
+        selected ? "border-[var(--brand-primary)] bg-[var(--brand-surface)] text-[var(--brand-primary)]"
+          : "border-[var(--brand-line)] text-[var(--brand-ink)] hover:bg-[var(--brand-surface)]"
+      }`}
+      disabled={disabled}
+      onClick={onSelect}
+      type="button"
+    >
+      <Icon aria-hidden="true" className="size-5 shrink-0" />
+      {title}
+    </button>
   );
 }

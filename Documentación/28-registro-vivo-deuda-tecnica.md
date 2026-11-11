@@ -39,6 +39,8 @@ La aceptación de Point con terminal conectada sigue pendiente.
 
 La vista operativa del expediente omite la consulta de historial de paquetes. El contrato histórico sigue disponible para sus consumidores administrativos.
 
+La tabla de contrataciones en recepción filtra las últimas 25 ventas que ofrece GET /sales y presenta hasta ocho operaciones de membresía o paquetes. El resumen de venta aporta tipo, socio, estado, folio e importe. El producto y su vigencia se consultan en el detalle existente.
+
 ## 2. Deuda activa
 
 | ID | Pri. | Módulo | Estado | Hallazgo e impacto | Criterio de cierre |
